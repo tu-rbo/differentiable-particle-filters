@@ -20,7 +20,7 @@ If you are using this implementation in your research, please consider giving cr
 Dependencies
 ------------
 
-Our code builds on the following python3 libraries:
+Our code builds on python3 and the following libraries:
 
 numpy
 
@@ -38,15 +38,14 @@ TensorFlow --> https://www.tensorflow.org/install/
 Setup
 -----
 
-The setup.sh script downloads the data for training and testing an creates additional folders. To perform these steps, simply run (in the main folder):
+The setup script *downloads the data* for training and testing and *creates additional folders* (for logging etc.). To perform these steps, simply run (in the main folder):
 
+    chmod +x setup.sh
     ./setup.sh
 
 Usage
 -----
 
-If all dependencies are met and, you can execute a simple experiment by running the following command in the main folder:
+If all dependencies are met and setup is done, you can execute a simple experiment by running the following command in the main folder to train and test a differentiable particle filter for global localization in maze 1. 
 
     python3 -m experiments.simple
-
-which will train and test a differentiable particle filter for global localization in maze 1. 
