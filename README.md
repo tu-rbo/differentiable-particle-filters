@@ -46,8 +46,6 @@ The setup script *downloads the data* for training and testing and *creates addi
 Usage
 -----
 
-If all dependencies are met and, you can execute a simple experiment by running the following command in the main folder:
+If all dependencies are met and setup is done, you can execute a simple experiment by running the following command in the main folder to train and test a differentiable particle filter for global localization in maze 1. 
 
     python3 -m experiments.simple
-
-which will train and test a differentiable particle filter for global localization in maze 1. 
