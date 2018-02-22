@@ -20,7 +20,7 @@ If you are using this implementation in your research, please consider giving cr
 Dependencies
 ------------
 
-Our code builds on the following python3 libraries:
+Our code builds on python3 and the following libraries:
 
 numpy
 
