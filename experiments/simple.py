@@ -5,7 +5,7 @@ from utils.data_utils import load_data, noisyfy_data, make_batch_iterator, remov
 from utils.exp_utils import get_default_hyperparams
 
 
-def train_dpf(task='nav01', data_path='../data/100s', model_path='../models/tmp'):
+def train_dpf(task='nav01', data_path='../data/100s', model_path='../models/tmp', plot=False):
 
     # load training data and add noise
     train_data = load_data(data_path=data_path, filename=task + '_train')
@@ -20,7 +20,7 @@ def train_dpf(task='nav01', data_path='../data/100s', model_path='../models/tmp'
 
     with tf.Session() as session:
         # train method and save result in model_path
-        method.fit(session, noisy_train_data, model_path, **hyperparams['train'])
+        method.fit(session, noisy_train_data, model_path, **hyperparams['train'], plot=plot)
 
 
 def test_dpf(task='nav01', data_path='../data/100s', model_path='../models/tmp'):
@@ -47,5 +47,5 @@ def test_dpf(task='nav01', data_path='../data/100s', model_path='../models/tmp')
 
 
 if __name__ == '__main__':
-    train_dpf()
+    train_dpf(plot=True)
     test_dpf()
