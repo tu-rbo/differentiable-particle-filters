@@ -40,6 +40,7 @@ Setup
 
 The setup.sh script downloads the data for training and testing an creates additional folders. To perform these steps, simply run (in the main folder):
 
+    chmod +x setup.sh
     ./setup.sh
 
 Usage
