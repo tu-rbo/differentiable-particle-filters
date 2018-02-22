@@ -46,8 +46,10 @@ The setup script *downloads the data* for training and testing and *creates addi
 Usage
 -----
 
-If all dependencies are met and setup is done, you can train and test a differentiable particle filter for global localization in maze 1 by running the following command in the main folder:
+If all dependencies are met and setup is done, you can train and test a differentiable particle filter for global localization in maze 1 by running the following in the main folder:
 
-    python3 -m experiments.simple
+    cd experiments; export PYTHONPATH=../; python3 simple.py; cd ..
+    
+Alternatively, you can import the project into the PyCharm IDE and and run experiments/simple.py from there. (The convoluted command comes from the fact how PyCharm handles relative imports and relative paths.)
 
 This command will first learn the different models (motion model, observation likelihood estimator, and particle proposer) separately and then jointly end-to-end. The command line output will show the current training and validation losses (mean +- standard error), where ">>" indicates a new lowest validation loss. Training will stop if the validation loss has not been reduced for a while (e.g. 200 epochs).
