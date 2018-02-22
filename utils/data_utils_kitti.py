@@ -96,7 +96,7 @@ def load_kitti_sequences(sequence_list=None):
             sequence_list = list(range(11))
 
         print('Cache not found, loading from KITTI_dataset')
-        path = "../../KITTI_dataset/Images_oxts"
+        path = "../data/kitti"
 
         image_seq_1_full_path = ["{}/{:02d}/image_2".format(path, x) for x in sequence_list]
         image_seq_2_full_path = ["{}/{:02d}/image_3".format(path, x) for x in sequence_list]

@@ -20,7 +20,7 @@ def train_dpf(task='nav01', data_path='../data/100s', model_path='../models/tmp'
 
     with tf.Session() as session:
         # train method and save result in model_path
-        method.fit(session, noisy_train_data, model_path, **hyperparams['train'], plot=plot)
+        method.fit(session, noisy_train_data, model_path, **hyperparams['train'], plot_task=task, plot=plot)
 
 
 def test_dpf(task='nav01', data_path='../data/100s', model_path='../models/tmp'):

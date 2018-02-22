@@ -399,7 +399,7 @@ class DPF():
                            'train_ex': make_batch_iterator(data['train'], batch_size=batch_size, seq_len=seq_len),
                            'val_ex': make_batch_iterator(data['val'], batch_size=batch_size, seq_len=seq_len),
                            'train1': make_batch_iterator(data['train'], batch_size=batch_size, seq_len=2),
-                           'val1': make_repeating_batch_iterator(data['val'], batch_size=batch_size, seq_len=2),
+                           'val1': make_repeating_batch_iterator(data['val'], epoch_lengths['val'], batch_size=batch_size, seq_len=2),
                            }
 
         # compute some statistics of the training data
