@@ -38,7 +38,7 @@ TensorFlow --> https://www.tensorflow.org/install/
 Setup
 -----
 
-The setup.sh script downloads the data for training and testing an creates additional folders. To perform these steps, simply run (in the main folder):
+The setup script *downloads the data* for training and testing and *creates additional folders* (for logging etc.). To perform these steps, simply run (in the main folder):
 
     chmod +x setup.sh
     ./setup.sh
