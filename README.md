@@ -50,7 +50,7 @@ If all dependencies are met and setup is done, you can train and test a differen
 
     cd experiments; export PYTHONPATH=../; python3 simple.py; cd ..
     
-*Alternatively, you can import the project into the PyCharm IDE and and run experiments/simple.py from there. (The convoluted command comes from the fact how PyCharm handles relative imports and relative paths.)*
+*Alternatively, you can import the project into the PyCharm IDE and and run `experiments/simple.py` from there. (The convoluted command comes from how PyCharm handles relative imports and relative paths.)*
 
 This command will first learn the different models (motion model, observation likelihood estimator, and particle proposer) separately and then jointly end-to-end. The command line output will show the current losses on training and validation data (mean +- standard error), where ">>" indicates a new lowest validation loss. Training will stop if the best validation loss has decreased for a while (e.g. 200 epochs). You should see something like this:
 
