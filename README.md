@@ -38,7 +38,7 @@ TensorFlow --> https://www.tensorflow.org/install/
 Setup
 -----
 
-The setup script *downloads the data* for training and testing and *creates additional folders* (for logging etc.). To perform these steps, simply run (in the main folder):
+The setup script **downloads the data** for training and testing and **creates additional folders** (for logging etc.). To perform these steps, simply run (in the main folder):
 
     chmod +x setup.sh
     ./setup.sh
@@ -50,12 +50,12 @@ If all dependencies are met and setup is done, you can train and test a differen
 
     cd experiments; export PYTHONPATH=../; python3 simple.py; cd ..
     
-Alternatively, you can import the project into the PyCharm IDE and and run experiments/simple.py from there. (The convoluted command comes from the fact how PyCharm handles relative imports and relative paths.)
+*Alternatively, you can import the project into the PyCharm IDE and and run experiments/simple.py from there. (The convoluted command comes from the fact how PyCharm handles relative imports and relative paths.)*
 
-This command will first learn the different models (motion model, observation likelihood estimator, and particle proposer) separately and then jointly end-to-end. The command line output will show the current training and validation losses (mean +- standard error), where ">>" indicates a new lowest validation loss. Training will stop if the validation loss has not been reduced for a while (e.g. 200 epochs). You should see something like this:
+This command will first learn the different models (motion model, observation likelihood estimator, and particle proposer) separately and then jointly end-to-end. The command line output will show the current losses on training and validation data (mean +- standard error), where ">>" indicates a new lowest validation loss. Training will stop if the best validation loss has decreased for a while (e.g. 200 epochs). You should see something like this:
 
 ![Screenshot](https://raw.githubusercontent.com/tu-rbo/differentiable-particle-filters/master/screenshot.png)
 
-As next steps, you can play around with the hyperparameters in utils/exp_utils.py, go through the differentiable particle filter code in methods/dpf.py, and run other experiments, e.g. applying the filter to the KITTI visual odometry task by running:
+As next steps, you can play around with the hyperparameters in `utils/exp_utils.py`, go through the differentiable particle filter code in `methods/dpf.py`, and run other experiments, e.g. applying the filter to the KITTI visual odometry task by running:
 
     cd experiments; export PYTHONPATH=../; python3 cross_validation_kitti.py; cd ..
