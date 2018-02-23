@@ -698,7 +698,7 @@ class DPF():
                       **{self.placeholders['num_particles']: 100},
                       }
 
-        s_measurement_model_out = sess.run([measurement_model_out], input_dict)
+        s_measurement_model_out = sess.run(measurement_model_out, input_dict)
 
         plt.figure('Measurement Model Output')
         plt.gca().clear()
@@ -731,128 +731,58 @@ class DPF():
     def plot_particle_filter(self, sess, batch, particle_list,
                         particle_probs_list, num_particles, state_step_sizes, task):
 
-        #batch = next(batch_iterators[key + '_ex'])
+        num_particles = 1000
+        head_scale = 1.5
+        quiv_kwargs = {'scale_units': 'xy', 'scale': 1. / 40., 'width': 0.003, 'headlength': 5 * head_scale,
+                       'headwidth': 3 * head_scale, 'headaxislength': 4.5 * head_scale}
+        marker_kwargs = {'markersize': 4.5, 'markerfacecolor': 'None', 'markeredgewidth': 0.5}
 
-        s_states, s_particle_list, s_particle_probs_list \
-            = sess.run([self.placeholders['s'], particle_list,
-                        particle_probs_list],
-                       {**{self.placeholders[key]: batch[key] for key in 'osa'},
-                        **{self.placeholders['num_particles']: num_particles},
-                        })
+        color_list = plt.cm.tab10(np.linspace(0, 1, 10))
+        colors = {'lstm': color_list[0], 'pf_e2e': color_list[1], 'pf_ind_e2e': color_list[2], 'pf_ind': color_list[3],
+                  'ff': color_list[4], 'odom': color_list[4]}
 
+        pred, s_particle_list, s_particle_probs_list = self.predict(sess, batch, num_particles,
+                                                                      return_particles=True)
 
-        # s_pred_states = np.argmax(np.reshape(s_pred_states, list(s_pred_states.shape[:2]) + [10,5,8]), axis=2) * 100
-        #
-        # plt.figure('Example: ' + key)
-        # plt.gca().clear()
-        # plot_maze('nav01')
-        # last_states = s_states[:, -1, :]
-        # last_pred_states = s_pred_states[:, -1, :]
-        # s_states = np.reshape(s_states, [-1, 3])
-        # s_pred_states = np.reshape(s_pred_states, [-1, 3])
-        # errors = np.concatenate([s_states[:, np.newaxis, :], s_pred_states[:, np.newaxis, :]], axis=1)
-        # last_errors = np.concatenate([last_states[:, np.newaxis, :], last_pred_states[:, np.newaxis, :]],
-        #                              axis=1)
-        # plt.plot(errors[:, :, 0].T, errors[:, :, 1].T, '--', color='gray')
-        # plt.plot(last_errors[:, :, 0].T, last_errors[:, :, 1].T, '-k')
-        # plt.plot(s_states[:, 0], s_states[:, 1], 'xb')
-        # plt.plot(s_pred_states[:, 0], s_pred_states[:, 1], 'xg' if key == 'val' else 'xr')
+        num_steps = 20  # s_particle_list.shape[1]
 
-        # if key == 'val':
-        #     # print(s_particle_list.shape[0], np.min(np.min(s_particle_probs_list[:, 0, :])),
-        #     #       np.max(np.max(s_particle_probs_list[:, 0, :])))
-        #     plt.figure('Check')
-        #     plt.gca().clear()
-        #     plot_maze('nav01')
-        #     i = 0
-        #     for s in range(s_particle_list.shape[0]):
-        #         plt.scatter(s_particle_list[s, i, :, 0], s_particle_list[s, i, :, 1],
-        #         # plt.scatter(s_particle_list[s, i, :, 0] + np.random.normal(scale=50, size=self.num_particles), s_particle_list[s, i, :, 1] + np.random.normal(scale=50, size=self.num_particles),
-        #                     c=s_initial_likelihood[s, :], cmap='coolwarm', marker='o', s=3,
-        #                     linewidths=0.05,
-        #                     vmin=0.0,
-        #                     vmax=1.0)
+        for s in range(1):
 
-        num_steps = s_particle_list.shape[1]
-
-        for k in [0]:
-
-            plt.figure('particle_evolution, colored by {}'.format(k))
+            plt.figure("example {}".format(s), figsize=[12, 5.15])
             plt.gca().clear()
-            plt.hold(False)
 
-            for s in range(2):
+            for i in range(num_steps):
+                ax = plt.subplot(4, 5, i + 1, frameon=False)
+                plt.gca().clear()
 
-                for d in range(3):
-                    plt.figure('particle_evolution, colored by {}'.format(k))
-                    plt.subplot(3, 4, 1 + s + 4 * d)
-                    plt.gca().clear()
-                    plt.hold(False)
+                plot_maze(task, margin=5, linewidth=0.5)
 
-                    for i in range(num_steps):
+                if i < num_steps - 1:
+                    ax.quiver(s_particle_list[s, i, :, 0], s_particle_list[s, i, :, 1],
+                              np.cos(s_particle_list[s, i, :, 2]), np.sin(s_particle_list[s, i, :, 2]),
+                              s_particle_probs_list[s, i, :], cmap='viridis_r', clim=[.0, 2.0 / num_particles],
+                              alpha=1.0,
+                              **quiv_kwargs
+                              )
 
-                        plt.scatter(i * np.ones_like(s_particle_list[s, i, :, d]),
-                                    s_particle_list[s, i, :, d] / state_step_sizes[d],
-                                    # c=s_particle_probs_list[s, i, :], cmap='viridis_r', marker='o', s=3, alpha=0.1,
-                                    c=s_particle_probs_list[s, i, :], cmap='Greys', marker='o', s=3, alpha=0.1,
-                                    # c=s_particle_probs_list[s, i, :], marker='o', s=3,
-                                    linewidths=0.05,
-                                    vmin=0.0,
-                                    vmax=0.02)
-                                    #np.max(
-                                        #s_add_probs_list[s, i, :, 0]))  # , vmin=-1/filter.num_particles,)
-                        plt.hold(True)
-                        current_state = batch['s'][s, i, d] / state_step_sizes[d]
-                        plt.plot([i], [current_state], 'o', markerfacecolor='None', markeredgecolor='k',
-                                 markersize=2.5)
-                        # plt.plot([i, i], [current_state, current_state + current_action], '-m', linewidth=0.1)
+                    current_state = batch['s'][s, i, :]
+                    plt.quiver(current_state[0], current_state[1], np.cos(current_state[2]),
+                               np.sin(current_state[2]), color="red", **quiv_kwargs)
 
-                    # plt.axis([-1, num_steps, 0, 10, ])
+                    plt.plot(current_state[0], current_state[1], 'or', **marker_kwargs)
+                else:
 
-                    plt.xlabel('Time')
-                    # plt.xticks([])
-                    plt.ylabel('State {}'.format(d))
+                    ax.plot(batch['s'][s, :num_steps, 0], batch['s'][s, :num_steps, 1], '-', linewidth=0.6, color='red')
+                    ax.plot(pred[s, :num_steps, 0], pred[s, :num_steps, 1], '-', linewidth=0.6,
+                            color=colors['pf_ind_e2e'])
 
-                    plt.figure("example {}, colored by {}".format(s, k))
-                    plt.gca().clear()
+                    ax.plot(batch['s'][s, :1, 0], batch['s'][s, :1, 1], '.', linewidth=0.6, color='red', markersize=3)
+                    ax.plot(pred[s, :1, 0], pred[s, :1, 1], '.', linewidth=0.6, markersize=3,
+                            color=colors['pf_ind_e2e'])
 
-                    for i in range(num_steps):
-                        plt.subplot(int(np.ceil(num_steps**0.5)), int(np.ceil(num_steps**0.5)), i + 1)
-                        plt.gca().clear()
-                        plot_maze(task)
-                        # plt.scatter(s_particle_list[s, i, :, 0], s_particle_list[s, i, :, 1],
-                        #             c=s_particle_probs_list[s, i, :], cmap='viridis_r', marker='o', s=3, linewidths=0.05, alpha=0.7,
-                        #             # c=s_particle_probs_list[s, i, :], marker='o', s=3, linewidths=0.05,
-                        #             vmin=0.0,
-                        #             vmax=np.max(s_particle_probs_list[s, i, :]))
-                        plt.quiver(s_particle_list[s, i, :, 0], s_particle_list[s, i, :, 1],
-                                   # np.cos(s_particle_list[s, i, :, 2]), np.sin(s_particle_list[s, i, :, 2]), s_particle_probs_list[s, i, :], cmap='viridis_r')#, clim=[0.0, 1.0])
-                                   np.cos(s_particle_list[s, i, :, 2]), np.sin(s_particle_list[s, i, :, 2]), s_particle_probs_list[s, i, :], cmap='viridis_r', clim=[0.0, 0.02])
-                        plt.hold(True)
-                        current_state = batch['s'][s, i, :]
-                        plt.plot([current_state[0]], [current_state[1]], 'o', markerfacecolor='None',
-                                 markeredgecolor='red',
-                                 markersize=1.5)
-                        plt.quiver(current_state[0], current_state[1], np.cos(current_state[2]),
-                                   np.sin(current_state[2]), color="red")
-                        mean_x = np.sum(s_particle_list[s, i, :, 0] * s_particle_probs_list[s, i, :])
-                        mean_y = np.sum(s_particle_list[s, i, :, 1] * s_particle_probs_list[s, i, :])
-                        mean_cos = np.sum(np.cos(s_particle_list[s, i, :, 2]) * s_particle_probs_list[s, i, :])
-                        mean_sin = np.sum(np.sin(s_particle_list[s, i, :, 2]) * s_particle_probs_list[s, i, :])
-                        l = (mean_cos ** 2 + mean_sin ** 2) ** 0.5
-                        mean_cos /= l
-                        mean_sin /= l
-                        # plt.plot(mean_x, mean_y, 'o', markerfacecolor='None',
-                        #          markeredgecolor='b',
-                        #          markersize=1.5)
-                        # plt.quiver(mean_x, mean_y, mean_cos, mean_sin, color="b")
-
-                        # plt.xlim([network.state_min[0], network.state_max[0]])
-                        # plt.ylim([network.state_min[1], network.state_max[1]])
-                        # plt.xlabel('x')
-                        # plt.ylabel('y')
-                        plt.gca().set_aspect('equal')
-                        plt.xticks([])
-                        plt.yticks([])
+                plt.subplots_adjust(left=0.0, bottom=0.0, right=1.0, top=1.0, wspace=0.001, hspace=0.1)
+                plt.gca().set_aspect('equal')
+                plt.xticks([])
+                plt.yticks([])
 
         show_pause(pause=0.01)

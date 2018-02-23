@@ -182,9 +182,10 @@ def load_kitti_sequences(sequence_list=None):
 
         t2 = time()
         print('Done! ({:.2f}s)'.format(t2 - t1))
-        if len(sequence_list) == 11:
-            print('Saving data to cache in ../data/kitti')
-            np.savez('../data/kitti', s=s, a=a, o=o, seq_num=seq_num, weights=weights)
+        print('By default not saving data to cache ... ')
+        # if len(sequence_list) == 11:
+        #     print('Saving data to cache in ../data/kitti')
+        #     np.savez('../data/kitti', s=s, a=a, o=o, seq_num=seq_num, weights=weights)
 
         print(s.shape, a.shape, o.shape, seq_num.shape, weights.shape)
 
