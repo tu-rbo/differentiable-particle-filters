@@ -4,7 +4,7 @@ Differentiable Particle Filters
 Author and Contact
 ------------------
 
-Rico Jonschkowski (rico.j@gmx.de)
+Rico Jonschkowski (rico.jonschkowski@tu-berlin.de)
 
 
 Introduction
