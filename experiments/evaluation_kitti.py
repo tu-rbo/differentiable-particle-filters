@@ -43,7 +43,7 @@ def get_evaluation_stats(model_path='../models/tmp/', test_trajectories=[11], se
                         continue
 
                     # test_batch_iterator = make_batch_iterator(test_data, seq_len=50)
-                    test_batch_iterator = make_batch_iterator_for_evaluation(data, start_step, trajectory=0, batch_size=1, seq_len=end_step-start_step)
+                    test_batch_iterator = make_batch_iterator_for_evaluation(data, start_step, trajectory=i, batch_size=1, seq_len=end_step-start_step)
 
                     batch = next(test_batch_iterator)
                     batch_input = remove_state(batch, provide_initial_state=True)
