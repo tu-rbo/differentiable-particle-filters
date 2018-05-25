@@ -54,7 +54,7 @@ The setup script **downloads the data** for training and testing (~2.5GB) and **
 Usage
 -----
 
-After all dependencies are installed and setup is done, there is one more thing which needs to be done every time a new shell is opened before the code can be run. In the main repository folder, you need run the following command to append the parent directory to the PYTHONPATH. *Alternatively, you can import the project into the PyCharm IDE and and run `experiments/simple.py` from there. The convoluted command comes from how PyCharm handles relative imports and relative paths.*
+After all dependencies are installed and setup is done, there is one more thing which needs to be done every time a new shell is opened before the code can be run. In the main repository folder, you need run the following command to append the parent directory to the PYTHONPATH. *Alternatively, you can import the project into the PyCharm IDE and and run `experiments/simple.py` from there. The need for running this command comes from how PyCharm handles relative imports and relative paths.*
 
 	export PYTHONPATH="${PYTHONPATH}:../"
 
