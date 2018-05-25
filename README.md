@@ -54,16 +54,18 @@ The setup script **downloads the data** for training and testing (~2.5GB) and **
 Usage
 -----
 
-After all dependencies are installed and setup is done, you can train and test a differentiable particle filter for global localization in maze 1 by running the following commands in the main folder:
+After all dependencies are installed and setup is done, there is one more thing which needs to be done every time a new shell is opened before the code can be run. In the main repository folder, you need run the following command to append the parent directory to the PYTHONPATH. *Alternatively, you can import the project into the PyCharm IDE and and run `experiments/simple.py` from there. The convoluted command comes from how PyCharm handles relative imports and relative paths.*
 
-    cd experiments; export PYTHONPATH=../; python3 simple.py; cd ..
+	export PYTHONPATH="${PYTHONPATH}:../"
+
+After this is done, you can train and test a differentiable particle filter for global localization in maze 1 by running the following commands in the main folder:
+
+    cd experiments; python3 simple.py; cd ..
     
-*Alternatively, you can import the project into the PyCharm IDE and and run `experiments/simple.py` from there. (The convoluted command comes from how PyCharm handles relative imports and relative paths.)*
-
 This command will first train the different models (motion model, observation likelihood estimator, and particle proposer) individually and then train them jointly end-to-end. The command line output will show the current losses on training and validation data (mean +- standard error), where ">>" indicates a new lowest validation loss. Training will stop if the best validation loss has not decreased for a while (e.g. 200 epochs). You should see something like this (the different plots are generated one after another):
 
 ![Screenshot](https://raw.githubusercontent.com/tu-rbo/differentiable-particle-filters/master/screenshot.png)
 
-As next steps, you can play around with the hyperparameters in `utils/exp_utils.py`, go through the differentiable particle filter code in `methods/dpf.py`, and run other experiments, e.g. applying the filter to the KITTI visual odometry task by running:
+As next steps, you can play around with the hyperparameters in `utils/exp_utils.py`, go through the differentiable particle filter code in `methods/dpf.py`, and run other experiments, e.g. applying the filter to the KITTI visual odometry task by running the following command (if you computer has enough memory to run it).
 
-    cd experiments; export PYTHONPATH=../; python3 cross_validation_kitti.py; cd ..
+    cd experiments; python3 cross_validation_kitti.py; cd ..
