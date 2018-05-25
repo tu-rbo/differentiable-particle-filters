@@ -16,7 +16,7 @@ If you are using this implementation in your research, please consider giving cr
 
     @article{jonschkowski18,
         title = {{Differentiable Particle Filters: End-to-End Learning with Algorithmic Priors}},
-	    booktitle = {Proceedings of {Robotics}: {Science} and {Systems} ({RSS})},
+	    booktitle = {{Proceedings of Robotics: Science and Systems (RSS)}},
 	    author = {Jonschkowski, Rico and Rastogi, Divyam and Brock, Oliver},
 	    year = {2018},
     }
