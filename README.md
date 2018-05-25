@@ -66,6 +66,6 @@ This command will first train the different models (motion model, observation li
 
 ![Screenshot](https://raw.githubusercontent.com/tu-rbo/differentiable-particle-filters/master/screenshot.png)
 
-As next steps, you can play around with the hyperparameters in `utils/exp_utils.py`, go through the differentiable particle filter code in `methods/dpf.py`, and run other experiments, e.g. applying the filter to the KITTI visual odometry task by running the following command (if you computer has enough memory to run it).
+As next steps, you can play around with the hyperparameters in `utils/exp_utils.py`, go through the differentiable particle filter code in `methods/dpf.py`, and run other experiments, e.g. applying the filter to the KITTI visual odometry task by running the following command (if your computer has enough memory :D).
 
     cd experiments; python3 cross_validation_kitti.py; cd ..
