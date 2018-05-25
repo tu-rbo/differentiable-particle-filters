@@ -1,7 +1,7 @@
 Differentiable Particle Filters
 ==================================================
 
-Author and Contact
+Contact
 ------------------
 
 Rico Jonschkowski (rico.jonschkowski@tu-berlin.de)
@@ -10,17 +10,21 @@ Rico Jonschkowski (rico.jonschkowski@tu-berlin.de)
 Introduction
 ------------
 
-This folder contains our source code for differentiable particle filters (DPFs) described in the paper "Differentiable Particle Filters: End-to-End Learning with Algorithmic Priors" (Jonschkowski et al. 2018). This implementation complements the paper to provide sufficient detail for reproducing our results and for reusing the method in other research (extensive explanations and descriptions are omitted here and can be found in the paper [TODO add link here]).
+This folder contains our source code for differentiable particle filters (DPFs) described in the paper "Differentiable Particle Filters: End-to-End Learning with Algorithmic Priors" (Jonschkowski et al. 2018). This implementation complements the paper to provide sufficient detail for reproducing our results and for reusing the method in other research (extensive explanations and descriptions are omitted here and can be found in the paper [TODO add link here after paper was published]).
 
 If you are using this implementation in your research, please consider giving credit by citing our paper:
 
-    @article{TODO
+    @article{jonschkowski18,
+        title = {{Differentiable Particle Filters: End-to-End Learning with Algorithmic Priors}},
+	    booktitle = {Proceedings of {Robotics}: {Science} and {Systems} ({RSS})},
+	    author = {Jonschkowski, Rico and Rastogi, Divyam and Brock, Oliver},
+	    year = {2018},
     }
 
 Dependencies
 ------------
 
-Our code builds on python3 and the following libraries:
+Our code builds on python3 and the following libraries. 
 
 numpy
 
@@ -30,10 +34,14 @@ matplotlib
 
     sudo apt-get install python3-matplotlib
 
-Sonnet --> https://github.com/deepmind/sonnet 
+TensorFlow --> https://www.tensorflow.org/install/, e.g. 
 
-TensorFlow --> https://www.tensorflow.org/install/
+    pip3 install tensorflow
 
+Sonnet --> https://github.com/deepmind/sonnet, e.g. 
+
+    pip3 install dm-sonnet
+    
 
 Setup
 -----
