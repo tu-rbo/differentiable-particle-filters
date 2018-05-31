@@ -10,7 +10,7 @@ Rico Jonschkowski (rico.jonschkowski@tu-berlin.de)
 Introduction
 ------------
 
-This repository contains our source code for differentiable particle filters (DPFs) described in the paper "Differentiable Particle Filters: End-to-End Learning with Algorithmic Priors" (Jonschkowski et al. 2018). This implementation is meant to complement the paper. Our goal is to enable others to reproduce our results and to build on our research by reusing our code. We do not include extensive explanations here -- these can be found in our paper https://arxiv.org/pdf/1805.11122.pdf).
+This repository contains our source code for differentiable particle filters (DPFs) described in the paper "Differentiable Particle Filters: End-to-End Learning with Algorithmic Priors" (Jonschkowski et al. 2018). This implementation is meant to complement the paper. Our goal is to enable others to reproduce our results and to build on our research by reusing our code. We do not include extensive explanations here -- these can be found in our paper https://arxiv.org/pdf/1805.11122.pdf.
 
 If you are using this implementation in your research, please consider giving credit by citing our paper:
 
