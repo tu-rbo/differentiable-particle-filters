@@ -3,12 +3,13 @@ import sonnet as snt
 
 from utils.data_utils import *
 from utils.method_utils import compute_sq_distance
-
+slim = tf.contrib.slim
+from utils.data_utils_tfrecord import pad, LeakyReLU
 
 class DeepVOLSTM():
     def __init__(self, init_with_true_state=False, model='2lstm', **unused_kwargs):
 
-        self.placeholders = {'o': tf.placeholder('float32', [None, None, 24, 24, 3], 'observations'),
+        self.placeholders = {'o': tf.placeholder('float32', [None, None, 384, 1280, 3], 'observations'),
                      'a': tf.placeholder('float32', [None, None, 3], 'actions'),
                      's': tf.placeholder('float32', [None, None, 3], 'states'),
                      'keep_prob': tf.placeholder('float32')}
@@ -16,52 +17,49 @@ class DeepVOLSTM():
         self.init_with_true_state = init_with_true_state
         self.model = model
 
+
         # build models
-        # <-- observation
-        self.encoder = snt.Sequential([
-            snt.nets.ConvNet2D([16, 32, 64], [[3, 3]], [2], [snt.SAME], activate_final=True, name='encoder/convnet'),
-            snt.BatchFlatten(),
-            lambda x: tf.nn.dropout(x, self.placeholders['keep_prob']),
-            snt.Linear(128, name='encoder/Linear'),
-            tf.nn.relu,
-        ])
+        self.encoder = snt.Module(name='FlowNetS', build=self.custom_build)
 
         # <-- action
         if self.model == '2lstm':
             self.rnn1 = snt.LSTM(1000)
             self.rnn2 = snt.LSTM(1000)
-        if self.model == '2gru':
-            self.rnn1 = snt.GRU(512)
-            self.rnn2 = snt.GRU(512)
-        elif self.model == 'ff':
-            self.ff_lstm_replacement = snt.Sequential([
-                snt.Linear(512),
-                tf.nn.relu,
-                snt.Linear(512),
-                tf.nn.relu])
 
         self.belief_decoder = snt.Sequential([
-            snt.Linear(256),
-            tf.nn.relu,
-            snt.Linear(256),
-            tf.nn.relu,
             snt.Linear(3)
         ])
 
     def custom_build(self, inputs):
         """A custom build method to wrap into a sonnet Module."""
-        outputs = snt.Conv2D(output_channels=16, kernel_shape=[7, 7], stride=[1, 1])(inputs)
-        outputs = tf.nn.relu(outputs)
-        outputs = snt.Conv2D(output_channels=16, kernel_shape=[5, 5], stride=[1, 2])(outputs)
-        outputs = tf.nn.relu(outputs)
-        outputs = snt.Conv2D(output_channels=16, kernel_shape=[5, 5], stride=[1, 2])(outputs)
-        outputs = tf.nn.relu(outputs)
-        outputs = snt.Conv2D(output_channels=16, kernel_shape=[5, 5], stride=[2, 2])(outputs)
-        outputs = tf.nn.relu(outputs)
-        outputs = tf.nn.dropout(outputs,  self.placeholders['keep_prob'])
-        outputs = snt.BatchFlatten()(outputs)
-        outputs = snt.Linear(128)(outputs)
-        outputs = tf.nn.relu(outputs)
+        with slim.arg_scope([slim.conv2d, slim.conv2d_transpose],
+                            # Only backprop this network if trainable
+                            trainable=True,
+                            # He (aka MSRA) weight initialization
+                            weights_initializer=slim.variance_scaling_initializer(),
+                            activation_fn=tf.nn.relu,
+                            # We will do our own padding to match the original Caffe code
+                            padding='VALID'):
+            weights_regularizer = slim.l2_regularizer(0.0004)
+            with slim.arg_scope([slim.conv2d], weights_regularizer=weights_regularizer):
+                with slim.arg_scope([slim.conv2d], stride=2):
+                    conv_1 = slim.conv2d(pad(inputs, 3), 64, 7, scope='conv1')
+                    conv_2 = slim.conv2d(pad(conv_1, 2), 128, 5, scope='conv2')
+                    conv_3 = slim.conv2d(pad(conv_2, 2), 256, 5, scope='conv3')
+
+                conv3_1 = slim.conv2d(pad(conv_3), 256, 3, scope='conv3_1')
+                with slim.arg_scope([slim.conv2d], num_outputs=512, kernel_size=3):
+                    conv4 = slim.conv2d(pad(conv3_1), stride=2, scope='conv4')
+                    conv4_1 = slim.conv2d(pad(conv4), scope='conv4_1')
+                    conv5 = slim.conv2d(pad(conv4_1), stride=2, scope='conv5')
+                    conv5_1 = slim.conv2d(pad(conv5), scope='conv5_1')
+                conv6 = slim.conv2d(pad(conv5_1), 1024, 3, stride=2, scope='conv6')
+                # conv6_1 = slim.conv2d(pad(conv6), 1024, 3, scope='conv6_1')
+
+        # outputs = tf.nn.dropout(conv6,  self.placeholders['keep_prob'])
+        outputs = snt.BatchFlatten()(conv6)   #outputs
+        # outputs = snt.Linear(128)(outputs)
+        # outputs = tf.nn.relu(outputs)
 
         return outputs
 
@@ -168,22 +166,11 @@ class DeepVOLSTM():
         flag = tf.concat([tf.ones_like(self.placeholders['s'][:,:1,:1]), tf.zeros_like(self.placeholders['s'][:,1:,:1])], axis=1)
 
         preproc_o = snt.BatchApply(self.encoder)((self.placeholders['o'] - means['o']) / stds['o'])
-        # include tracking info
-        if self.init_with_true_state:
-            # preproc_o = tf.concat([preproc_o, tracking_info, flag], axis=2)
-            preproc_o = tf.concat([preproc_o, tracking_info, flag], axis=2)
-            # preproc_o = tf.concat([preproc_o, tracking_info_full], axis=2)
-
-        preproc_a = snt.BatchApply(snt.BatchFlatten())(self.placeholders['a'] / stds['a'])
-        preproc_ao = tf.concat([preproc_o, preproc_a], axis=-1)
 
         if self.model == '2lstm' or self.model == '2gru':
-            lstm1_out, lstm1_final_state = tf.nn.dynamic_rnn(self.rnn1, preproc_ao, dtype=tf.float32)
+            lstm1_out, lstm1_final_state = tf.nn.dynamic_rnn(self.rnn1, preproc_o, dtype=tf.float32)
             lstm2_out, lstm2_final_state = tf.nn.dynamic_rnn(self.rnn2, lstm1_out, dtype=tf.float32)
             belief_list = lstm2_out
-
-        elif self.model == 'ff':
-            belief_list = snt.BatchApply(self.ff_lstm_replacement)(preproc_ao)
 
         self.pred_states = snt.BatchApply(self.belief_decoder)(belief_list)
         self.pred_states = self.pred_states * stds['s'] + means['s']

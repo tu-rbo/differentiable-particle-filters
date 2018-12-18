@@ -24,6 +24,18 @@ def load_image(img_file):
 
     return np.asarray(tmp)
 
+def pad(tensor, num=1):
+    """
+    Pads the given tensor along the height and width dimensions with `num` 0s on each side
+    """
+    return tf.pad(tensor, [[0, 0], [num, num], [num, num], [0, 0]], "CONSTANT")
+
+def LeakyReLU(x, leak=0.1, name="lrelu"):
+    with tf.variable_scope(name):
+        f1 = 0.5 * (1.0 + leak)
+        f2 = 0.5 * (1.0 - leak)
+        return f1 * x + f2 * abs(x)
+
 # loading all sequences for KITTI
 def store_kitti_sequences_as_tf_record(sequence_list=None):
 
