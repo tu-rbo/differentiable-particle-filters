@@ -3,14 +3,16 @@ import tensorflow as tf
 from methods.dpf_kitti import DPF
 from utils.exp_utils_kitti import get_default_hyperparams
 import numpy as np
+import os
 
 def run_cross_validation(i):
 
     print('RUNNING CROSS VALIDATION TRAINING FOR TESTING {}'.format(i))
 
-    model_path = '../models/tmp/cross_validation_ind_e2e/model_trained_ex_{}'.format(i)
+    model_path = '../models/tmp/cross_validation_ind_e2e/model_trained_deepvo_{}'.format(i)
 
-    training_subsequences = [j for j in range(11) if j not in [i]]
+    # training_subsequences = [j for j in range(11) if j not in [i]]
+    training_subsequences = [0, 2, 8, 9, 10]
 
     # Load all subsequences
     data = load_kitti_sequences(training_subsequences)
@@ -27,7 +29,7 @@ def run_cross_validation(i):
 
     # instantiate method
     hyperparams = get_default_hyperparams()
-    hyperparams['train']['split_ratio'] = 0.9  # -> 18/2 split
+    hyperparams['train']['split_ratio'] = 0.8  # -> 18/2 split
 
     method = DPF(**hyperparams['global'])
 
@@ -36,5 +38,6 @@ def run_cross_validation(i):
         method.fit(session, data, model_path, plot=False, **hyperparams['train'])
 
 if __name__ == '__main__':
-    for i in range(11):
-        run_cross_validation(i)
+    # for i in range(11):
+    os.environ["CUDA_VISIBLE_DEVICES"] = "2,3"
+    run_cross_validation(0)

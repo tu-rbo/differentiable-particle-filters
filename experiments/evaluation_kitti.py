@@ -6,8 +6,9 @@ from utils.data_utils_kitti import load_data, noisyfy_data, make_batch_iterator,
 from utils.exp_utils_kitti import get_default_hyperparams
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 
-def get_evaluation_stats(model_path='../models/tmp/', test_trajectories=[11], seq_lengths = [100, 200, 400, 800], plot_results=False):
+def get_evaluation_stats(model_path='../models/tmp/cross_validation_ind_e2e/model_trained_deepvo_0', test_trajectories=[3, 4, 5, 6, 7, 10], seq_lengths = [100, 200, 400, 800], plot_results=False):
 
     data = load_kitti_sequences(test_trajectories)
 
@@ -37,7 +38,7 @@ def get_evaluation_stats(model_path='../models/tmp/', test_trajectories=[11], se
 
                 for start_step in range(0, distance.shape[0], 1):
 
-                    end_step, dist = find_end_step(distance, start_step, seq_len, use_meters=False)  #--> Put use_meters = True for official KITTI benchmark results
+                    end_step, dist = find_end_step(distance, start_step, seq_len, use_meters=True)  #--> Put use_meters = True for official KITTI benchmark results
 
                     if end_step == -1:
                         continue
@@ -157,7 +158,10 @@ def find_all_cross_val_models(model_path):
     import os
     models = ([name for name in os.listdir(model_path) if not os.path.isfile(os.path.join(model_path, name))])
     trajs = [int(name.split('_')[3]) for name in models]
-    return zip(models, trajs)
+    print (models, trajs)
+    # return zip(models, trajs)
+    return zip(['model_trained_deepvo_0', 'model_trained_deepvo_0', 'model_trained_deepvo_0','model_trained_deepvo_0'
+                ,'model_trained_deepvo_0','model_trained_deepvo_0'], [3, 4, 5, 6, 7, 10])
 
 def main():
     plt.ion()
@@ -195,4 +199,6 @@ def main():
             print('{:>5} error averaged over seq_lens: {:.4f} +- {:.4f}'.format(measure, np.mean(e_means), np.std(e_means, ddof=1) / np.sqrt(len(e_means))))
 
 if __name__ == '__main__':
+    os.environ["CUDA_VISIBLE_DEVICES"] = "2,3"
     main()
+
