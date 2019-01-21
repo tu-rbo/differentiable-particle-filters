@@ -46,7 +46,7 @@ def load_data(data_path='../data/100s', filename='nav01_train', steps_per_episod
             data[key] = data[key][:num_episodes*steps_per_episode]
         data[key] = np.reshape(data[key], [-1, steps_per_episode] + list(data[key].shape[1:])).astype('float32')
 
-    # convert degrees into radients and
+    # convert degrees into gradients and
     for key in ['pose', 'vel']:
         data[key][:, :, 2] *= np.pi / 180
     # angles should be between -pi and pi
