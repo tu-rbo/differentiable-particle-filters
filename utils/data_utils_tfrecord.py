@@ -5,18 +5,19 @@ import math
 import glob
 from time import time
 from PIL import Image
+import matplotlib.image as mpimg
 import tensorflow as tf
 
 def _bytes_feature(value):
     return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
 
 def _int64_feature(value):
-  """Returns an int64_list from a bool / enum / int / uint."""
-  return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
+    """Returns an int64_list from a bool / enum / int / uint."""
+    return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
 
 def _float_feature(value):
-  """Returns a float_list from a float / double."""
-  return tf.train.Feature(float_list=tf.train.FloatList(value=[value]))
+    """Returns a float_list from a float / double."""
+    return tf.train.Feature(float_list=tf.train.FloatList(value=[value]))
 
 def load_image(img_file):
     tmp = Image.open(img_file)
@@ -30,13 +31,14 @@ def pad(tensor, num=1):
     """
     return tf.pad(tensor, [[0, 0], [num, num], [num, num], [0, 0]], "CONSTANT")
 
+
 def LeakyReLU(x, leak=0.1, name="lrelu"):
     with tf.variable_scope(name):
         f1 = 0.5 * (1.0 + leak)
         f2 = 0.5 * (1.0 - leak)
         return f1 * x + f2 * abs(x)
 
-# loading all sequences for KITTI
+    # loading all sequences for KITTI
 def store_kitti_sequences_as_tf_record(sequence_list=None):
 
     path = "/mnt/StorageDevice/KITTI/original_dataset/dataset/sequences"
@@ -44,36 +46,28 @@ def store_kitti_sequences_as_tf_record(sequence_list=None):
     print('Loading KITTI DATA')
 
     if sequence_list is None:
-        sequence_list = list(range(11))
+        sequence_list = [4]#list(range(11))
 
     print('Cache not found, loading from KITTI_dataset')
 
     image_seq_1_full_path = ["{}/{:02d}/image_2".format(path, x) for x in sequence_list]
-    image_seq_2_full_path = ["{}/{:02d}/image_3".format(path, x) for x in sequence_list]
+    # image_seq_2_full_path = ["{}/{:02d}/image_3".format(path, x) for x in sequence_list]
 
     # Extract original image and difference image
-    for i in sequence_list:
+    for i, value in enumerate(sequence_list):
         input_image_file = []
 
         for name in glob.glob('{}/*.png'.format(image_seq_1_full_path[i])):
             input_image_file = input_image_file + [name]
-        for name in glob.glob('{}/*.png'.format(image_seq_2_full_path[i])):
-            input_image_file = input_image_file + [name]
-
+        # for name in glob.glob('{}/*.png'.format(image_seq_2_full_path[i])):
+        #     input_image_file = input_image_file + [name]
         input_image_file.sort()
-    # print (input_image_file)
 
-        oxts_seq_1 = ["%.2d_image1.txt" % i]
-        oxts_seq_1 = oxts_seq_1 + ["%.2d_image2.txt" % i]
+        oxts_seq_1 = ["%.2d_image1.txt" % value]
+        # oxts_seq_1 = oxts_seq_1 + ["%.2d_image2.txt" % value]
         oxts_seq_1.sort()
         oxts_seq_1_full_path = ["{}/{}".format(path, x) for x in oxts_seq_1]
         output_oxts_file = oxts_seq_1_full_path
-
-        path_to_save = "/mnt/StorageDevice/KITTI"
-        tfrecords_filename = "kitti.tfrecords"
-
-        writer = tf.python_io.TFRecordWriter("{}/kitti_{}.tfrecords".format(path_to_save, i))
-
         s = []
         for j in range(len(output_oxts_file)):
     #   # load text file
@@ -91,32 +85,36 @@ def store_kitti_sequences_as_tf_record(sequence_list=None):
     #     s[start:seq_num[ii], 2] = theta[1:]  # angle
     #     s[start:seq_num[ii], 3] = np.sqrt((y[1:] - y[:-1]) ** 2 + (x[1:] - x[:-1]) ** 2) / 0.103  # forward vel
     #     s[start:seq_num[ii], 4] = wrap_angle(theta[1:] - theta[:-1]) / 0.103  # angular vel
+        path_to_save = "/mnt/StorageDevice/KITTI"
+        tfrecords_filename = "kitti.tfrecords"
 
-        count = 0
-        for img_path in input_image_file:
-            img = load_image(img_path)
-            height = img.shape[0]
-            width = img.shape[1]
+        with tf.python_io.TFRecordWriter("{}/kitti_{}.tfrecords".format(path_to_save, value)) as writer:
 
+            count = 1
+            for k in range(len(input_image_file)-1):
+                img_next = load_image(input_image_file[k+1])
+                img_previous = load_image(input_image_file[k])
+                concat_img = np.concatenate((img_previous, img_next), axis = 2)
+                height, width = img_next.shape[0], img_next.shape[1]
 
-            img_raw = img.tostring()
+                img_raw = concat_img.tobytes()
 
-            example = tf.train.Example(features=tf.train.Features(feature={
-                'height': _int64_feature(height),
-                'width': _int64_feature(width),
-                'image_raw': _bytes_feature(img_raw),
-                'x': _float_feature(s[count, 11]),
-                'y': _float_feature(-s[count, 3]),
-                'theta': _float_feature(-np.arctan2(-s[count, 8], s[count, 10]))}))
+                example = tf.train.Example(features=tf.train.Features(feature={
+                    'height': _int64_feature(height),
+                    'width': _int64_feature(width),
+                    'image_raw': _bytes_feature(img_raw),
+                    'x': _float_feature(s[count, 11]),
+                    'y': _float_feature(-s[count, 3]),
+                    'theta': _float_feature(-np.arctan2(-s[count, 8], s[count, 10]))}))
 
-            writer.write(example.SerializeToString())
-        count += 1
-        print (count)
+                writer.write(example.SerializeToString())
+                count += 1
+            print (count)
 
 def test_tfrecord():
 
     path_to_save = "/mnt/StorageDevice/KITTI"
-    tfrecords_filename = "kitti.tfrecords"
+    tfrecords_filename = "kitti_0.tfrecords"
 
 
     reconstructed_images = []
@@ -143,7 +141,7 @@ def test_tfrecord():
         img_1d = np.fromstring(img_string, dtype=np.uint8)
         reconstructed_img = img_1d.reshape((height, width, -1))
 
-        print(height)
+        print(reconstructed_img)
     # oxts_seq_1 = ["%.2d_image1.txt" % i for i in sequence_list]
     # oxts_seq_1 = oxts_seq_1 + ["%.2d_image2.txt" % i for i in sequence_list]
     # oxts_seq_1.sort()
@@ -202,6 +200,38 @@ def test_tfrecord():
     #
     #     start = 0 if ii == 0 else seq_num[ii-1]
 
+def _parse_function(example_proto):
+    features = {
+              'height': tf.FixedLenFeature((), tf.int64, default_value=0),
+              'width': tf.FixedLenFeature((), tf.int64, default_value=0),
+              'image_raw': tf.FixedLenFeature((), tf.string),
+              'x': tf.FixedLenFeature((), tf.float32, default_value=0),
+              'y': tf.FixedLenFeature((), tf.float32, default_value=0),
+              'theta': tf.FixedLenFeature((), tf.float32, default_value=0)
+              }
+    parsed_features = tf.parse_single_example(example_proto, features)
+
+    height = tf.cast(parsed_features['height'], tf.int64)
+    width = tf.cast(parsed_features['width'], tf.int64)
+
+    image = tf.decode_raw(parsed_features['image_raw'], tf.uint8)
+    image = tf.cast(image, tf.float32)
+    image = tf.reshape(image, [384, 1280, 6])
+
+
+    x = tf.cast(parsed_features['x'], tf.float32)
+    y = tf.cast(parsed_features['y'], tf.float32)
+    theta = tf.cast(parsed_features['theta'], tf.float32)
+
+    state = tf.stack([x, y, theta], axis = -1)
+    action = tf.stack([0., 0., 0.], axis = -1)
+
+    # return image, height, width
+
+    return image, state
+
+    # return {'o': image, 's': np.array([x, y, theta]), 'a': np.zeros((3,))}
+
+
 if __name__ == '__main__':
     store_kitti_sequences_as_tf_record()
-    # test_tfrecord()

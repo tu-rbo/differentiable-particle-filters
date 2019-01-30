@@ -17,7 +17,7 @@ def get_default_hyperparams():
         'train': {
             'train_individually': True,
             'train_e2e': True,
-            'split_ratio': 0.9,
+            'split_ratio': 1,
             'seq_len': 20,
             'batch_size': 32,
             'epoch_length': 50,

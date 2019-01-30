@@ -4,7 +4,7 @@ import tensorflow as tf
 from utils.data_utils_kitti import wrap_angle
 
 
-def compute_sq_distance(a, b, state_step_sizes):
+def compute_sq_distance(a, b, state_step_sizes=[1, 1, 1]):
     result = 0.0
     for i in range(a.shape[-1]):
         # compute difference
