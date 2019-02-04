@@ -46,7 +46,7 @@ def store_kitti_sequences_as_tf_record(sequence_list=None):
     print('Loading KITTI DATA')
 
     if sequence_list is None:
-        sequence_list = [4]#list(range(11))
+        sequence_list = [0, 2, 8, 9]#list(range(11))
 
     print('Cache not found, loading from KITTI_dataset')
 
@@ -199,6 +199,9 @@ def test_tfrecord():
     #         tmp = np.loadtxt(f)
     #
     #     start = 0 if ii == 0 else seq_num[ii-1]
+
+def concat_datasets(*tensor_list):
+    return tf.concat(tensor_list, axis=0)
 
 def _parse_function(example_proto):
     features = {

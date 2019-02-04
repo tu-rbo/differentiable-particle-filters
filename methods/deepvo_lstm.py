@@ -4,7 +4,8 @@ import sonnet as snt
 from utils.data_utils import *
 from utils.method_utils import compute_sq_distance
 slim = tf.contrib.slim
-from utils.data_utils_tfrecord import pad, LeakyReLU, _parse_function
+from utils.data_utils_tfrecord import pad, LeakyReLU, _parse_function, concat_datasets
+from tensorflow.contrib.data.python.ops import sliding
 
 class DeepVOLSTM():
     def __init__(self, init_with_true_state=False, model='2lstm', **unused_kwargs):
@@ -73,16 +74,41 @@ class DeepVOLSTM():
         #                    'val_ex': make_batch_iterator(data['val'], batch_size=batch_size, seq_len=seq_len)}
 
         ###################### Using the dataset API ##################################
-        filenames = ["/mnt/StorageDevice/KITTI/kitti_4.tfrecords"]
-        dataset = tf.data.TFRecordDataset(filenames)
-        dataset = dataset.map(_parse_function)
+
+        sequences = [0, 2, 8, 9]
+        filenames = []
+        for i in sequences:
+            filenames.append("/mnt/StorageDevice/KITTI/kitti_{}.tfrecords".format(i))
+
+        dataset = []
+        for c, value in enumerate(filenames):
+        # filenames = ["/mnt/StorageDevice/KITTI/kitti_0.tfrecords", ]
+            dataset.append(tf.data.TFRecordDataset(value))
+            dataset[c] = dataset[c].map(_parse_function)
 
         # stacked_dataset = dataset.batch(2)
 
         # stacked_dataset = stacked_dataset.shuffle(buffer_size=10000)
-        # dataset = dataset.shuffle(buffer_size=10000)
-        dataset = dataset.batch(10)
-        dataset = dataset.batch(2)
+        # dataset = dataset.batch(10)
+
+        # sliding window batch
+            window = 20
+            stride = 1
+            dataset[c] = dataset[c].apply(sliding.sliding_window_batch(window, stride))
+
+        # zipped_ds = tf.data.Dataset.zip(dataset)
+        # dataset = zipped_ds.map(concat_datasets)
+        ds0 = dataset[0]
+        for i in dataset[1:]:
+            ds0 = tf.data.Dataset.concatenate(dataset)
+
+        # dataset = dataset.batch(4)
+        # dataset = dataset.shuffle(buffer_size=1000)
+
+        unbalanced_ds = dataset.batch(4)
+
+        # dataset = dataset.map(_parse_function)
+
         iterator = dataset.make_initializable_iterator()
 
         next_image, next_state = iterator.get_next()
@@ -130,11 +156,11 @@ class DeepVOLSTM():
             sess.run(iterator.initializer)
             loss_lists = {lk: [] for lk in loss_keys}
             batches_length = 0
-            while True:
+            # while True:
                 # try:
                 # a = sess.run(next_image)
                 # b = sess.run(next_state)
-                self.model.fit(steps_per_epoch=1, epochs=5, verbose=2)
+            self.model.fit(steps_per_epoch=1, epochs=3, verbose=2)
         #           s_losses, _ = sess.run([losses, train_op])
         #             for lk in loss_keys:
         #                 loss_lists[lk].append(s_losses[lk])
