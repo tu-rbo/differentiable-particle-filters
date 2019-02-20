@@ -3,7 +3,7 @@ import tensorflow as tf
 from methods.deepvo_lstm import DeepVOLSTM
 from utils.data_utils import load_data, noisyfy_data, make_batch_iterator, remove_state
 from utils.exp_utils import get_default_hyperparams
-
+from keras import backend as K
 
 def train_deepvo():
 
@@ -18,8 +18,13 @@ def train_deepvo():
     hyperparams = get_default_hyperparams()
     method = DeepVOLSTM(**hyperparams['global'])
 
-    with tf.Session() as session:
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+
+    with tf.Session(config=config) as session:
         # train method and save result in model_path
+        K.set_session(session)
+
         method.fit(session,**hyperparams['train'])
 
 
