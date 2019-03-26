@@ -93,7 +93,13 @@ def store_kitti_sequences_as_tf_record(sequence_list=None):
             count = 1
             for k in range(len(input_image_file)-1):
                 img_next = load_image(input_image_file[k+1])
+                # img_next = img_next[..., [2, 1, 0]]
+                # if img_next.max() > 1.0:
+                #     img_next = img_next / 255.0
                 img_previous = load_image(input_image_file[k])
+                # img_previous = img_previous[...,[2, 1, 0]]
+                # if img_previous.max() > 1.0:
+                #     img_previous = img_previous / 255.0
                 concat_img = np.concatenate((img_previous, img_next), axis = 2)
                 height, width = img_next.shape[0], img_next.shape[1]
 
@@ -221,6 +227,8 @@ def _parse_function(example_proto):
     image = tf.cast(image, tf.float32)
     image = tf.reshape(image, [384, 1280, 6])
 
+    image = image / 255.0
+    # image = image[...,[2, 1, 0, 5, 4, 3]]
 
     x = tf.cast(parsed_features['x'], tf.float32)
     y = tf.cast(parsed_features['y'], tf.float32)

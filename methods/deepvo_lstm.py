@@ -5,10 +5,13 @@ from utils.data_utils import *
 from utils.method_utils import compute_sq_distance
 slim = tf.contrib.slim
 from utils.data_utils_tfrecord import pad, LeakyReLU, _parse_function, concat_datasets
+from utils.adam_accumulate import Adam_accumulate
 from tensorflow.contrib.data.python.ops import sliding
+from utils.data_utils_kitti import compute_statistics, load_kitti_sequences
 import random
-# from tensorflow.python.keras._impl.keras import backend as K
-# from keras import backend as K
+import math
+import keras
+from keras import backend as K
 # import memory_saving_gradients
 
 class DeepVOLSTM():
@@ -32,7 +35,7 @@ class DeepVOLSTM():
 
         # self.output_layer = snt.Linear(output_size=3, name='LSTM_to_out')
 
-    def custom_build(self, inputs):
+    def conv_model(self, inputs):
         """A custom build method to wrap into a sonnet Module."""
         with slim.arg_scope([slim.conv2d, slim.conv2d_transpose],
                             # Only backprop this network if trainable
@@ -41,7 +44,8 @@ class DeepVOLSTM():
                             weights_initializer=slim.variance_scaling_initializer(),
                             activation_fn=tf.nn.relu,
                             # We will do our own padding to match the original Caffe code
-                            padding='VALID'):
+                            padding='VALID',
+                            reuse=tf.AUTO_REUSE):
             weights_regularizer = slim.l2_regularizer(0.0004)
             with slim.arg_scope([slim.conv2d], weights_regularizer=weights_regularizer):
                 with slim.arg_scope([slim.conv2d], stride=2):
@@ -56,174 +60,122 @@ class DeepVOLSTM():
                     conv5 = slim.conv2d(pad(conv4_1), stride=2, scope='conv5')
                     conv5_1 = slim.conv2d(pad(conv5), scope='conv5_1')
                 conv6 = slim.conv2d(pad(conv5_1), 1024, 3, stride=2, scope='conv6')
-                # conv6_1 = slim.conv2d(pad(conv6), 1024, 3, scope='conv6_1')
-                print(conv6.get_shape())
-        # outputs = tf.nn.dropout(conv6,  self.placeholders['keep_prob'])
-        outputs = tf.reshape(conv6, [-1, conv6.get_shape()[1]*conv6.get_shape()[2]*conv6.get_shape()[3]])   #outputs
-        print(outputs.get_shape())
-        # outputs = snt.Linear(128)(outputs)
-        # outputs = tf.nn.relu(outputs)
+
+        outputs = tf.layers.Flatten()(conv6)
 
         return outputs
 
-    def fit(self, sess, split_ratio, learning_rate, dropout_keep_ratio, **unused_kwargs):
+    def fit(self, sess, learning_rate, batch_seq_len, num_of_samples, epoch_length, num_epochs, patience, batch_size, **unused_kwargs):
 
-        # preprocess data
-
-        # data = split_data(data, ratio=split_ratio)
-        # epoch_lengths = {'train': epoch_length, 'val': epoch_length*2}
-        # batch_iterators = {'train': make_batch_iterator(data['train'], batch_size=batch_size, seq_len=seq_len),
-        #                    'val': make_repeating_batch_iterator(data['val'], epoch_lengths['val'], batch_size=batch_size, seq_len=seq_len),
-        #                    'train_ex': make_batch_iterator(data['train'], batch_size=batch_size, seq_len=seq_len),
-        #                    'val_ex': make_batch_iterator(data['val'], batch_size=batch_size, seq_len=seq_len)}
-
-        ###################### Using the dataset API ##################################
-
+        full_seq_len = [4540, 4660, 4070, 1590]
+        # [0, 4540], [0, 1100], [0, 4660], [0, 800], [0, 270], [0, 2760], [0, 1100], [0, 1100], [1100, 5170], [0, 1590]
         training_sequences = [0, 2, 8, 9]
-        window = 32 #32
-        stride = 1
-        test_sequences = [i for i in range(11) if i not in training_sequences and i not in [1, 10]]
+        test_sequences = [10]
 
-        training_filenames = []
-        for i in training_sequences:
-            training_filenames.append("../data/kitti_tf_records/kitti_{}.tfrecords".format(i))
-
-        test_filenames = []
-        for i in test_sequences:
-            test_filenames.append("../data/kitti_tf_records/kitti_{}.tfrecords".format(i))
+        training_filenames = ["../data/kitti_tf_records/kitti_{}.tfrecords".format(i) for i in training_sequences]
+        test_filenames = ["../data/kitti_tf_records/kitti_{}.tfrecords".format(i) for i in test_sequences]
 
         ###### Training dataset creation
-        training_dataset = []
-        for c, value in enumerate(training_filenames):
-        # filenames = ["/mnt/StorageDevice/KITTI/kitti_0.tfrecords", ]
-            training_dataset.append(tf.data.TFRecordDataset(value))
-            training_dataset[c] = training_dataset[c].map(_parse_function)
-            training_dataset[c] = training_dataset[c].apply(sliding.sliding_window_batch(window, stride))
-            print("{} Done!".format(value))
-        random.shuffle(training_dataset)
-        ds0 = training_dataset[0]
-        for i in training_dataset[1:]:
-            ds0 = ds0.concatenate(i)
-        ds0 = ds0.shuffle(buffer_size=50) #50
-        training_dataset = ds0.batch(1)
-        print("Training dataset generated")
 
-        ##### Test dataset creation
-        test_dataset = []
-        for c, value in enumerate(test_filenames):
-        # filenames = ["/mnt/StorageDevice/KITTI/kitti_0.tfrecords", ]
-            test_dataset.append(tf.data.TFRecordDataset(value))
-            test_dataset[c] = test_dataset[c].map(_parse_function)
-            test_dataset[c] = test_dataset[c].apply(sliding.sliding_window_batch(window, stride))
-            print("{} Done!".format(value))
-        ds0 = test_dataset[0]
-        for i in test_dataset[1:]:
-            ds0 = ds0.concatenate(i)
-        test_dataset = ds0.batch(1)
-        print("Test dataset generated")
-        # stacked_dataset = stacked_dataset.shuffle(buffer_size=10000)
-        # dataset = dataset.batch(10)
+        training_dataset = self.generate_dataset(training_filenames, seq_len=full_seq_len, batch_seq_len=batch_seq_len,
+                                                 num_of_samples=num_of_samples)
+        iterator = tf.data.Iterator.from_structure(training_dataset.output_types, training_dataset.output_shapes)
 
-            # dataset[c] = dataset[c].shuffle(buffer_size=50)
+        handle = tf.placeholder(tf.string, shape=[])
+        # iterator = tf.data.Iterator.from_string_handle(handle, training_dataset.output_types, training_dataset.output_shapes)
+        train_init_op = iterator.make_initializer(training_dataset)
 
-        # zipped_ds = tf.data.Dataset.zip(dataset)
-        # dataset = zipped_ds.map(concat_datasets)
+        ###### Test dataset creation
+        test_dataset = self.generate_val_dataset(test_filenames, seq_len=[1590], batch_seq_len=batch_seq_len,
+                                                 num_of_samples=100)
+        test_init_op = iterator.make_initializer(test_dataset)
 
-        # iterator = dataset.from_structure(dataset.output_types, dataset.output_shapes)
+        self.image, self.state = iterator.get_next()
 
-        training_iterator = training_dataset.make_initializable_iterator()
-        test_iterator = test_dataset.make_one_shot_iterator()
-
-        next_image, next_state = training_iterator.get_next()
-        self.image_input = tf.keras.Input(tensor=next_image)
-
-        test_image, test_state = test_iterator.get_next()
-        self.test_input = tf.keras.Input(tensor=test_image)
-
-        # self.test_input = tf.keras.Input(tensor=test_image)
-        # means, stds, state_step_sizes, state_mins, state_maxs = compute_staticstics(data['train'])   #Needs to be changed
-
-        ###################### Connecting model and computing loss ##########################
-        # sq_dist = tf.keras.losses.mean_squared_error(self.pred_states, next_state)
-        # losses = {'mse': tf.reduce_mean(sq_dist),
-        #           'mse_last': tf.reduce_mean(sq_dist[:, -1])}
-
-        optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
-        # gradients = optimizer.compute_gradients(losses['mse'])
-        # clipped_gradients = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in gradients]
-        # train_op = optimizer.apply_gradients(gradients)
-
-        self.model = self.connect_modules()
-
-        for layer in self.model.layers:
-            print("Before loading")
-            weights = layer.get_weights()
-            print (weights)
-
-        # self.model.load_weights('/home/robotics/flownet2/models/FlowNet2-S/FlowNet2-S_weights.caffemodel.h5', by_name=False)
-        self.model.load_weights('/home/robotics/flownet2-tf/checkpoints/FlowNetS/flownet-S.ckpt-0', by_name=False)
+        ###### Input dimensions for keras model, defining model and optimizer used
+        ###### Model creation and defining inputs and outputs
+        self.image_input = keras.Input(shape=(batch_seq_len-1, 384, 1280, 6), tensor=self.image[:, 1:, :, :, :])
+        self.connect_modules()
 
 
-        for layer in self.model.layers:
-            print("After loading")
-            weights = layer.get_weights()
-            print (weights)
+        # Variables in tensorflow checkpoint. Need to have same sign to be able to restore.
+        vars_to_restore = [v for v in tf.global_variables() if "conv" in v.name]
+        vars_to_restore_old = []
+        dic_for_name_matching = {"conv":"FlowNetS/conv", "kernel": "weights", "bias":"biases", ":0":""}
+        for count, v in enumerate(vars_to_restore):
+            vars_to_restore_old.append(v.name)
+            for i,j in dic_for_name_matching.items():
+                vars_to_restore_old[count] = vars_to_restore_old[count].replace(i, j)
+        vars_to_restore_dic = dict(zip(vars_to_restore_old, vars_to_restore))
+        print(vars_to_restore_dic)
+        saver = tf.train.Saver(vars_to_restore_dic)
+        saver.restore(sess, '/home/robotics/flownet2-tf/checkpoints/FlowNetS/flownet-S.ckpt-0')
 
-        self.model.compile(optimizer=optimizer, loss=tf.keras.losses.mean_squared_error, target_tensors=[next_state[:, :, :]-next_state[:, :1, :]], metrics=['mae'])
-        # K.__dict__["gradients"] = memory_saving_gradients.gradients_memory
+        # self.model.compile(optimizer=optimizer, loss=keras.losses.mean_squared_error,
+        #                                     target_tensors = [state[:, :, :] - state[:, :1, :]], metrics=['mse'])
 
-        # init = tf.global_variables_initializer()
-        # sess.run(init)
+        self.setup_train(average_gradients=batch_size, lr=learning_rate)
+        sess.run(tf.global_variables_initializer())
 
         ################### Defining saving parameters #########################################
         saver = tf.train.Saver()
-        save_path = './models/tmp' + '/best_validation'
+        save_path = '../models/tmp' + '/best_deepvo_model_loss_10_step_dpf_theta'
 
         loss_keys = ['mse_last', 'mse']
-        if split_ratio < 1.0:
-            data_keys = ['train', 'val']
-        else:
-            data_keys = ['train']
+        # if split_ratio < 1.0:
+        #     data_keys = ['train', 'val']
+        # else:
+        #     data_keys = ['train']
 
         log = {lk: {'mean': [], 'se': []} for lk in loss_keys}
 
-        best_val_loss = np.inf
-        best_epoch = 0
-        # save statistics and prepare saving variables
-        # if not os.path.exists(model_path):
-        #     os.makedirs(model_path)
-        # np.savez(os.path.join(model_path, 'statistics'), means=means, stds=stds, state_step_sizes=state_step_sizes,
-        #          state_mins=state_mins, state_maxs=state_maxs)
+        loss_mse = 10000.0
+        patience_counter = 0
+        epochs = 0
+        best_loss = 10000
+        while epochs<num_epochs and patience_counter<patience:
+            epoch_lengths = 0
+            sess.run(train_init_op)
+            loss_degm = []
+            loss_mm = []
+            while epoch_lengths<epoch_length:
+                for _ in range(batch_size):
+                    tmp = self.train(sess)
+                    loss_degm.append(tmp[0])
+                    loss_mm.append(tmp[1])
+                training_dataset = self.generate_dataset(training_filenames, seq_len=full_seq_len, batch_seq_len=batch_seq_len,
+                                                         num_of_samples=num_of_samples)
+                train_init_op = iterator.make_initializer(training_dataset)
 
-        # Compute for 100 epochs.
-        for _ in range(100):
-            sess.run(training_iterator.initializer)
-            # sess.run(test_iterator.initializer)
-            loss_lists = {lk: [] for lk in loss_keys}
-            batches_length = 0
-            # while True:
-                # try:
-                # a = sess.run(next_image)
-                # b = sess.run(next_state)
-            # a = sess.run(next_image)
-            # print (a.shape)
-            self.model.fit(steps_per_epoch=100, epochs=1, verbose=2)
+                epoch_lengths += 1
+            print ("Epoch:", epochs, " ------ ", "deg/m:", (sum(loss_degm)/len(loss_degm)), " m/m:", (sum(loss_mm)/len(loss_mm)))
+            epochs += 1
 
-            ## Computing losses on the model
-            # while True:
-            #     loss = []
-            #     try:
-            #         test_output = sess.run(test_state)
-            #
-            #         predicted_output = self.model.predict(self.test_input, steps=1)
-            #         print ("Output", predicted_output)
-            #         print ("True", test_output)
-            #         loss.append(compute_sq_distance(predicted_output[:, -1, :], test_output[:, -1, :]-test_output[:, 0, :]))
-            #         # print (loss[-1])
-            #
-            #     except tf.errors.OutOfRangeError:
-            #         print(np.array(loss).shape)
-            #         break
+            #### Evaluating the model
+            print("Test epoch")
+            for _ in range(1):
+                test_loss_mm= []
+                test_loss_degm = []
+                sess.run(test_init_op)
+                while True:
+                    try:
+                        tmp = (sess.run([self._loss_op, self._loss]))
+                        test_loss_degm.append(tmp[0])
+                        test_loss_mm.append(tmp[1])
+                    except tf.errors.OutOfRangeError:
+                        break
+                test_loss_mm = sum(test_loss_mm)/len(test_loss_mm)
+                test_loss_degm = sum(test_loss_degm)/len(test_loss_degm)
+                print ("Test epoch ------", "deg/m:", test_loss_degm, " m/m:", test_loss_mm)
+
+                if test_loss_degm<best_loss:
+                    print("Model saved")
+                    saver.save(sess, save_path)
+                    best_loss = test_loss_degm
+                    patience_counter = 0
+                else:
+                    patience_counter += 1
+
         #           s_losses, _ = sess.run([losses, train_op])
         #             for lk in loss_keys:
         #                 loss_lists[lk].append(s_losses[lk])
@@ -290,82 +242,164 @@ class DeepVOLSTM():
 
         return log
 
+    def train(self, session):
+        feed_dict = dict()
+        if self._average_gradients == 1:
+            loss_degm, loss_mm, _ = session.run([self._loss_op, self._loss, self._train_op])
+        else:
+            loss_degm, loss_mm, grads = session.run([self._loss_op, self._loss, self._grad_op])
+            self._gradients.append(grads)
+            if len(self._gradients) == self._average_gradients:
+                for i, placeholder in enumerate(self._grad_placeholders):
+                    feed_dict[placeholder] = np.stack([g[i] for g in self._gradients], axis=0).mean(axis=0)
+                session.run(self._train_op, feed_dict)
+                self._gradients = []
+        return loss_degm, loss_mm
+
+    def setup_train(self, average_gradients=1, lr=1e-3):
+        self._average_gradients = average_gradients
+        sq_error_trans = tf.norm(self.pred_states[:, -10:, 0:2] - self.state[:, -10:, 0:2])
+        sq_dist = tf.norm(self.state[:, 0, 0:2] - self.state[:, -1, 0:2])
+        self._loss = tf.reduce_mean(sq_error_trans/sq_dist)
+        sq_error_rot = tf.norm(wrap_angle(self.state[:, -10:, 2] - self.pred_states[:, -10:, 2]))*(180/np.pi)
+        self._loss_op = tf.reduce_mean(sq_error_rot/ sq_dist)
+        self._loss_final = tf.add(self._loss, self._loss_op)
+        # self._loss_op = tf.losses.mean_squared_error(labels=self.state[:,-1, :] - self.state[:, 0, :],
+        #                                              predictions=self.pred_states)
+        optimizer = tf.train.AdamOptimizer(learning_rate=lr)
+
+        if average_gradients == 1:
+            # This 'train_op' computes gradients and applies them in one step.
+            self._train_op = optimizer.minimize(self._loss_op)
+        else:
+            # here 'train_op' only applies gradients passed via placeholders stored
+            # in 'grads_placeholders. The gradient computation is done with 'grad_op'.
+            grads_and_vars = optimizer.compute_gradients(self._loss_final)
+            avg_grads_and_vars = []
+            self._grad_placeholders = []
+            for grad, var in grads_and_vars:
+                grad_ph = tf.placeholder(grad.dtype, grad.shape)
+                self._grad_placeholders.append(grad_ph)
+                avg_grads_and_vars.append((grad_ph, var))
+            self._grad_op = [x[0] for x in grads_and_vars]
+            self._train_op = optimizer.apply_gradients(avg_grads_and_vars)
+            self._gradients = []  # list to store gradients
 
     def connect_modules(self):
 
-        # encoder_output = self.custom_build(inputs)
-        #
-        # conv_flat = tf.keras.layers.Flatten()(encoder_output)
-        #
-        # rnn_layers = [tf.nn.rnn_cell.LSTMCell(size) for size in [1000, 1000]]
-        #
-        # # create a RNN cell composed sequentially of a number of RNNCells
-        # lstm_core = tf.nn.rnn_cell.MultiRNNCell(rnn_layers)
-        #
-        # output_sequence, final_state = tf.nn.dynamic_rnn(
-        #     cell=lstm_core,
-        #     inputs=encoder_output,
-        #     time_major=False,
-        #      dtype=tf.float32)
-        #
-        # self.pred_states = tf.layers.dense(output_sequence, units=3)
-        # self.pred_states = self.pred_states * stds['s'] + means['s']
+        conv_model = keras.Sequential()
+        # conv_model.add(keras.layers.Conv2D(64, kernel_size=(7, 7), strides=(2, 2), padding='valid', name='conv1', input_shape=(384, 1280, 6),
+        #                                       trainable=False))
+        # conv_model.add(keras.layers.Conv2D(128, kernel_size=(5, 5), strides=(2, 2), padding='valid', name='conv2', trainable=False))
+        # conv_model.add(keras.layers.Conv2D(256, kernel_size=(5, 5), strides=(2, 2), padding='valid', name='conv3', trainable=False))
+        # conv_model.add(keras.layers.Conv2D(256, kernel_size=(3, 3), strides=(1, 1), padding='valid', name='conv3_1', trainable=False))
+        # conv_model.add(keras.layers.Conv2D(512, kernel_size=(3, 3), strides=(2, 2), padding='valid', name='conv4', trainable=False))
+        # conv_model.add(keras.layers.Conv2D(512, kernel_size=(3, 3), strides=(1, 1), padding='valid', name='conv4_1',trainable=False))
+        # conv_model.add(keras.layers.Conv2D(512, kernel_size=(3, 3), strides=(2, 2), padding='valid', name='conv5',trainable=False))
+        # conv_model.add(keras.layers.Conv2D(512, kernel_size=(3, 3), strides=(1, 1), padding='valid', name='conv5_1', trainable=False))
+        # conv_model.add(keras.layers.Conv2D(1024, kernel_size=(3, 3), strides=(2, 2), padding='valid', name='conv6', trainable=False))
 
-        conv_model = tf.keras.Sequential()
-        conv_model.add(tf.keras.layers.Conv2D(64, kernel_size=(7, 7), strides=(2, 2), padding='valid', name='FlowNetS/conv1', input_shape=(1280, 356, 6)))
-        conv_model.add(tf.keras.layers.Conv2D(128, kernel_size=(5, 5), strides=(2, 2), padding='valid', name='FlowNetS/conv2'))
-        conv_model.add(tf.keras.layers.Conv2D(256, kernel_size=(5, 5), strides=(2, 2), padding='valid', name='FlowNetS/conv3'))
-        conv_model.add(tf.keras.layers.Conv2D(256, kernel_size=(3, 3), strides=(1, 1), padding='valid', name='FlowNetS/conv3_1'))
-        conv_model.add(tf.keras.layers.Conv2D(512, kernel_size=(3, 3), strides=(2, 2), padding='valid', name='FlowNetS/conv4'))
-        conv_model.add(tf.keras.layers.Conv2D(512, kernel_size=(3, 3), strides=(1, 1), padding='valid', name='FlowNetS/conv4_1'))
-        conv_model.add(tf.keras.layers.Conv2D(512, kernel_size=(3, 3), strides=(2, 2), padding='valid', name='FlowNetS/conv5'))
-        conv_model.add(tf.keras.layers.Conv2D(512, kernel_size=(3, 3), strides=(1, 1), padding='valid', name='FlowNetS/conv5_1'))
-        conv_model.add(tf.keras.layers.Conv2D(1024, kernel_size=(3, 3), strides=(2, 2), padding='valid', name='FlowNetS/conv6'))
-        conv_model.add(tf.keras.layers.Flatten())
+        conv_model.add(keras.layers.Conv2D(64, kernel_size=(7, 7), strides=(2, 2), padding='valid', name='conv1', input_shape=(384, 1280, 6)))
+        conv_model.add(keras.layers.Conv2D(128, kernel_size=(5, 5), strides=(2, 2), padding='valid', name='conv2'))
+        conv_model.add(keras.layers.Conv2D(256, kernel_size=(5, 5), strides=(2, 2), padding='valid', name='conv3'))
+        conv_model.add(keras.layers.Conv2D(256, kernel_size=(3, 3), strides=(1, 1), padding='valid', name='conv3_1'))
+        conv_model.add(keras.layers.Conv2D(512, kernel_size=(3, 3), strides=(2, 2), padding='valid', name='conv4'))
+        conv_model.add(keras.layers.Conv2D(512, kernel_size=(3, 3), strides=(1, 1), padding='valid', name='conv4_1'))
+        conv_model.add(keras.layers.Conv2D(512, kernel_size=(3, 3), strides=(2, 2), padding='valid', name='conv5'))
+        conv_model.add(keras.layers.Conv2D(512, kernel_size=(3, 3), strides=(1, 1), padding='valid', name='conv5_1'))
+        conv_model.add(keras.layers.Conv2D(1024, kernel_size=(3, 3), strides=(2, 2), padding='valid', name='conv6'))
+        conv_model.add(keras.layers.Flatten())
 
 
-        # time_distribute = tf.keras.layers.TimeDistributed(tf.keras.layers.Lambda(lambda x: conv_model(x)))(self.image_input)
+        time_distribute = keras.layers.TimeDistributed(keras.layers.Lambda(lambda x: conv_model(x)))(self.image_input)
 
-        # lstm1 = tf.keras.layers.CuDNNLSTM(1000, return_sequences=True)(time_distribute)
-        # lstm2 = tf.keras.layers.CuDNNLSTM(1000, return_sequences=True)(lstm1)
+        lstm1 = keras.layers.CuDNNLSTM(1000, return_sequences=True)(time_distribute)
+        lstm2 = keras.layers.CuDNNLSTM(1000, return_sequences=True)(lstm1)
 
-        # self.pred_states = tf.keras.layers.Dense(3, activation='linear')(lstm2)
-
-        # model = tf.keras.Model(inputs=[self.image_input], outputs=[self.pred_states])
+        self.pred_states = keras.layers.Dense(3, activation='linear')(lstm2)
+        self.pred_states = self.pred_states + self.state[:, 0, :]
+        # model = keras.Model(inputs=[self.image_input], outputs=[self.pred_states])
 
         # return model
 
-        conv_model.add(tf.keras.layers.Dense(3))
-        return conv_model
+
+    def generate_dataset(self, filenames, seq_len=[4540, 4660, 4070, 1590], num_of_samples=50, batch_seq_len=32):
+
+        dataset = []
+        for c, value in enumerate(filenames):
+            dataset.append(tf.data.TFRecordDataset(value))   # Add all files to the dataset
+            seq_end = random.randint(1, seq_len[c])          # Get a random integer from (1, seq_len) of the sequence
+            dataset[c] = dataset[c].take(seq_end)            # Extract the first 'seq_end' elements of the sequence
+            dataset[c] = dataset[c].map(_parse_function)     # Extract the image and true state
+            shift = max(math.floor(seq_end / num_of_samples), 1)  # Compute the shift taking into account the 'seq_end' to have 'num_of_samples' elements in each dataset
+            dataset[c] = dataset[c].apply(sliding.sliding_window_batch(batch_seq_len, shift))  # Apply sliding window operation
+
+        random.shuffle(dataset)        # Shuffle the dataset list
+
+        ds0 = dataset[0]               # Concatenate the datasets
+        for i in dataset[1:]:
+            ds0 = ds0.concatenate(i)
+
+        dataset = ds0.take(num_of_samples*len(seq_len))
+        dataset = dataset.shuffle(buffer_size=20)
+        dataset = dataset.batch(1)     # Repeat the dataset with batch size of 1
+        dataset = dataset.repeat()
+
+        return dataset
+
+    def generate_val_dataset(self, filenames, seq_len=[800, 270], num_of_samples=50, batch_seq_len=32):
+
+        dataset = []
+        for c, value in enumerate(filenames):
+            dataset.append(tf.data.TFRecordDataset(value))   # Add all files to the dataset
+            seq_end = random.randint(1, seq_len[c])          # Get a random integer from (1, seq_len) of the sequence
+            dataset[c] = dataset[c].take(seq_end)            # Extract the first 'seq_end' elements of the sequence
+            dataset[c] = dataset[c].map(_parse_function)     # Extract the image and true state
+            shift = max(math.floor(seq_end / num_of_samples), 1)  # Compute the shift taking into account the 'seq_end' to have 'num_of_samples' elements in each dataset
+            dataset[c] = dataset[c].apply(sliding.sliding_window_batch(batch_seq_len, shift))  # Apply sliding window operation
+
+        ds0 = dataset[0]                                     # Concatenate the datasets
+        for i in dataset[1:]:
+            ds0 = ds0.concatenate(i)
+
+        ds0 = ds0.take(num_of_samples*len(seq_len))
+        dataset = ds0.batch(1)                       # Repeat the dataset with batch size of 1
+
+        return dataset
+
+    def generate_test_dataset(self, filenames, batch_seq_len = 32):
+
+        dataset = []
+        for c, value in enumerate(filenames):
+            dataset.append(tf.data.TFRecordDataset(value))   # Add all files to the dataset
+            dataset[c] = dataset[c].map(_parse_function)     # Extract the image and true state
+            dataset[c] = dataset[c].apply(sliding.sliding_window_batch(batch_seq_len, 100))  # Apply sliding window operation
+
+        ds0 = dataset[0]                                     # Concatenate the datasets
+        for i in dataset[1:]:
+            ds0 = ds0.concatenate(i)
+
+        dataset = ds0.batch(1)                                # Batch the dataset with batch size of 1
+        return dataset
+
+    def predict(self, sess, handle, test_handle):
+        # image_data, true_state = (sess.run([image, state]))
+        prediction, true_state = sess.run([self.pred_states, self.state], feed_dict={handle: test_handle})
+        # pred_true_state = sess.run([self.pred_states], feed_dict={'input_1:0': image_data})
+        return prediction, true_state
 
 
-    def predict(self, sess, batch, **unused_kwargs):
-        return sess.run(self.pred_states, batch)
-
-    def load(self, sess, model_path, model_file='best_validation', statistics_file='statistics.npz', connect_and_initialize=True):
+    def load(self, sess, model_path, batch_seq_len, num_of_samples, **unused_kwargs):
 
         # build the tensorflow graph
-        if connect_and_initialize:
-            # load training data statistics (which are needed to build the tf graph)
-            statistics = dict(np.load(os.path.join(model_path, statistics_file)))
-            for key in statistics.keys():
-                if statistics[key].shape == ():
-                    statistics[key] = statistics[key].item()  # convert 0d array of dictionary back to a normal dictionary
 
-            # connect all modules into the particle filter
-            self.connect_modules(**statistics)
-            init = tf.global_variables_initializer()
-            sess.run(init)
+        # self.image_input = keras.Input(shape=(batch_seq_len, 384, 1280, 6))
+        # self.model = self.connect_modules()
+        # self.model.load_weights('{}.h5'.format(model_path))
+        self.image_input = keras.Input(shape=(batch_seq_len-1, 384, 1280, 6), tensor=self.image[:, 1:, :, :, :])
+        self.connect_modules()
+        saver = tf.train.Saver()
+        saver.restore(sess, model_path)
 
-        # load variables
-        all_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)
-        for v in all_vars:
-            print("%s %r %s" % (v, v, v.shape))
+        return sess
 
-        # restore variable values
-        saver = tf.train.Saver()  # <- var list goes in here
-        saver.restore(sess, os.path.join(model_path, model_file))
-
-        # print('Loaded the following variables:')
-        # for v in all_vars:
-        #     print(v.name)
