@@ -69,3 +69,15 @@ This command will first train the different models (motion model, observation li
 As next steps, you can play around with the hyperparameters in `utils/exp_utils.py`, go through the differentiable particle filter code in `methods/dpf.py`, and run other experiments, e.g. applying the filter to the KITTI visual odometry task by running the following command (if your computer has enough memory :D).
 
     cd experiments; python3 cross_validation_kitti.py; cd ..
+    
+Deep Visual Odometry Implementation
+==================================================
+This branch also implements the paper
+ **DeepVO: Towards end-to-end visual odometry with deep Recurrent Convolutional Neural Networks**
+
+To execute the code, please run the python file:
+python3 experiments/test_run_deepvo.py
+
+The main algorithm is implemented in **/methods/deepvo_lstm.py**
+
+You can also change the learning parameters in **/utils/exp_utils.py**
