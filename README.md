@@ -75,8 +75,8 @@ Deep Visual Odometry Implementation
 This branch also implements the paper
  **DeepVO: Towards end-to-end visual odometry with deep Recurrent Convolutional Neural Networks**
 
-To execute the code, please run the python file:
-python3 experiments/test_run_deepvo.py
+To execute the code, please run the python file:  
+**python3 experiments/test_run_deepvo.py**
 
 The main algorithm is implemented in **/methods/deepvo_lstm.py**
 
