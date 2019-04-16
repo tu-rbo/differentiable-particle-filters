@@ -12,28 +12,13 @@ import random
 import math
 import keras
 from keras import backend as K
-# import memory_saving_gradients
 
 class DeepVOLSTM():
     def __init__(self, init_with_true_state=False, model='2lstm', **unused_kwargs):
 
-        # self.placeholders = {'o': tf.placeholder('float32', [None, None, 384, 1280, 3], 'observations'),
-        #              'a': tf.placeholder('float32', [None, None, 3], 'actions'),
-        #              's': tf.placeholder('float32', [None, None, 3], 'states'),
-        #              'keep_prob': tf.placeholder('float32')}
         self.pred_states = None
         self.init_with_true_state = init_with_true_state
         self.model = model
-
-        # self.image_input = tf.keras.Input(shape=(None, 384, 1280, 3), name='input_layer')
-        # build models
-        # self.encoder = snt.Module(name='FlowNetS', build=self.custom_build)
-
-        # <-- action
-        # if self.model == '2lstm':
-
-
-        # self.output_layer = snt.Linear(output_size=3, name='LSTM_to_out')
 
     def conv_model(self, inputs):
         """A custom build method to wrap into a sonnet Module."""
@@ -67,38 +52,32 @@ class DeepVOLSTM():
 
     def fit(self, sess, learning_rate, batch_seq_len, num_of_samples, epoch_length, num_epochs, patience, batch_size, **unused_kwargs):
 
-        full_seq_len = [4540, 4660, 4070, 1590]
-        # [0, 4540], [0, 1100], [0, 4660], [0, 800], [0, 270], [0, 2760], [0, 1100], [0, 1100], [1100, 5170], [0, 1590]
         training_sequences = [0, 2, 8, 9]
+        full_seq_len = [4540, 4660, 4070, 1590]   # Sequence lengths for the training trajectories
         test_sequences = [10]
 
         training_filenames = ["../data/kitti_tf_records/kitti_{}.tfrecords".format(i) for i in training_sequences]
         test_filenames = ["../data/kitti_tf_records/kitti_{}.tfrecords".format(i) for i in test_sequences]
 
-        ###### Training dataset creation
+        ###### Training dataset creation ######
 
         training_dataset = self.generate_dataset(training_filenames, seq_len=full_seq_len, batch_seq_len=batch_seq_len,
                                                  num_of_samples=num_of_samples)
         iterator = tf.data.Iterator.from_structure(training_dataset.output_types, training_dataset.output_shapes)
-
-        handle = tf.placeholder(tf.string, shape=[])
-        # iterator = tf.data.Iterator.from_string_handle(handle, training_dataset.output_types, training_dataset.output_shapes)
         train_init_op = iterator.make_initializer(training_dataset)
 
-        ###### Test dataset creation
+        ###### Test dataset creation ######
         test_dataset = self.generate_val_dataset(test_filenames, seq_len=[1590], batch_seq_len=batch_seq_len,
                                                  num_of_samples=100)
         test_init_op = iterator.make_initializer(test_dataset)
 
         self.image, self.state = iterator.get_next()
 
-        ###### Input dimensions for keras model, defining model and optimizer used
-        ###### Model creation and defining inputs and outputs
+        ###### Model creation and defining inputs and outputs ######
         self.image_input = keras.Input(shape=(batch_seq_len-1, 384, 1280, 6), tensor=self.image[:, 1:, :, :, :])
         self.connect_modules()
 
-
-        # Variables in tensorflow checkpoint. Need to have same sign to be able to restore.
+        ###### Variables to restore for pre-trained Flownet
         vars_to_restore = [v for v in tf.global_variables() if "conv" in v.name]
         vars_to_restore_old = []
         dic_for_name_matching = {"conv":"FlowNetS/conv", "kernel": "weights", "bias":"biases", ":0":""}
@@ -107,19 +86,16 @@ class DeepVOLSTM():
             for i,j in dic_for_name_matching.items():
                 vars_to_restore_old[count] = vars_to_restore_old[count].replace(i, j)
         vars_to_restore_dic = dict(zip(vars_to_restore_old, vars_to_restore))
-        print(vars_to_restore_dic)
         saver = tf.train.Saver(vars_to_restore_dic)
         saver.restore(sess, '/home/robotics/flownet2-tf/checkpoints/FlowNetS/flownet-S.ckpt-0')
 
-        # self.model.compile(optimizer=optimizer, loss=keras.losses.mean_squared_error,
-        #                                     target_tensors = [state[:, :, :] - state[:, :1, :]], metrics=['mse'])
-
+        ###### Setup training loss with gradient averaging
         self.setup_train(average_gradients=batch_size, lr=learning_rate)
         sess.run(tf.global_variables_initializer())
 
-        ################### Defining saving parameters #########################################
+        ###### Defining saving parameters ######
         saver = tf.train.Saver()
-        save_path = '../models/tmp' + '/best_deepvo_model_loss_10_step_dpf_theta'
+        save_path = '../models/tmp' + '/best_deepvo_model_loss_last_10_step_dpf_theta_Apr_4'
 
         loss_keys = ['mse_last', 'mse']
         # if split_ratio < 1.0:
@@ -151,7 +127,7 @@ class DeepVOLSTM():
             print ("Epoch:", epochs, " ------ ", "deg/m:", (sum(loss_degm)/len(loss_degm)), " m/m:", (sum(loss_mm)/len(loss_mm)))
             epochs += 1
 
-            #### Evaluating the model
+            ###### Evaluating the model ######
             print("Test epoch")
             for _ in range(1):
                 test_loss_mm= []
@@ -168,77 +144,13 @@ class DeepVOLSTM():
                 test_loss_degm = sum(test_loss_degm)/len(test_loss_degm)
                 print ("Test epoch ------", "deg/m:", test_loss_degm, " m/m:", test_loss_mm)
 
-                if test_loss_degm<best_loss:
+                if test_loss_degm < best_loss:
                     print("Model saved")
                     saver.save(sess, save_path)
                     best_loss = test_loss_degm
                     patience_counter = 0
                 else:
                     patience_counter += 1
-
-        #           s_losses, _ = sess.run([losses, train_op])
-        #             for lk in loss_keys:
-        #                 loss_lists[lk].append(s_losses[lk])
-        #                 batches_length += 1
-        #         except tf.errors.OutOfRangeError:
-        #             break
-        #     log[lk]['mean'].append(np.mean(loss_lists[lk]))
-        #     log[lk]['se'].append(np.std(loss_lists[lk], ddof=1) / np.sqrt(batches_length))
-        #
-        #     txt = ''
-        #     for lk in loss_keys:
-        #         txt += '{}: '.format(lk)
-        #         for dk in data_keys:
-        #             txt += '{:.2f}+-{:.2f}/'.format(log[dk][lk]['mean'][-1], log[dk][lk]['se'][-1])
-        #         txt = txt[:-1] + ' -- '
-        #     print(txt)
-        # # i = 0
-        # # while i < num_epochs and i - best_epoch < patience:
-        # #     # training
-        # #     loss_lists = dict()
-        # #     for dk in data_keys:
-        # #         loss_lists = {lk: [] for lk in loss_keys}
-        # #         for e in range(epoch_lengths[dk]):
-        # #             batch = next(batch_iterators[dk])
-        # #             if dk == 'train':
-        # #                 s_losses, _ = sess.run([losses, train_op], {**{self.placeholders[key]: batch[key] for key in 'osa'},
-        # #                                                         **{self.placeholders['keep_prob']: dropout_keep_ratio}})
-        # #             else:
-        # #                 s_losses = sess.run(losses, {**{self.placeholders[key]: batch[key] for key in 'osa'},
-        # #                                                     **{self.placeholders['keep_prob']: 1.0}})
-        # #             for lk in loss_keys:
-        # #                 loss_lists[lk].append(s_losses[lk])
-        # #         # after each epoch, compute and log statistics
-        # #         for lk in loss_keys:
-        # #             log[dk][lk]['mean'].append(np.mean(loss_lists[lk]))
-        # #             log[dk][lk]['se'].append(np.std(loss_lists[lk], ddof=1) / np.sqrt(epoch_lengths[dk]))
-        # #
-        # #     # check whether the current model is better than all previous models
-        # #     if 'val' in data_keys:
-        # #         if log['val']['mse_last']['mean'][-1] < best_val_loss:
-        # #             best_val_loss = log['val']['mse_last']['mean'][-1]
-        # #             best_epoch = i
-        # #             # save current model
-        # #             saver.save(sess, save_path)
-        # #             txt = 'epoch {:>3} >> '.format(i)
-        # #         else:
-        # #             txt = 'epoch {:>3} == '.format(i)
-        # #     else:
-        # #         best_epoch = i
-        # #         saver.save(sess, save_path)
-        # #         txt = 'epoch {:>3} >> '.format(i)
-        # #
-        # #     # after going through all data sets, do a print out of the current result
-        # #     for lk in loss_keys:
-        # #         txt += '{}: '.format(lk)
-        # #         for dk in data_keys:
-        # #             txt += '{:.2f}+-{:.2f}/'.format(log[dk][lk]['mean'][-1], log[dk][lk]['se'][-1])
-        # #         txt = txt[:-1] + ' -- '
-        # #     print(txt)
-        # #
-        # #     i += 1
-        #
-        # saver.restore(sess, save_path)
 
         return log
 
@@ -258,14 +170,13 @@ class DeepVOLSTM():
 
     def setup_train(self, average_gradients=1, lr=1e-3):
         self._average_gradients = average_gradients
-        sq_error_trans = tf.norm(self.pred_states[:, -10:, 0:2] - self.state[:, -10:, 0:2])
-        sq_dist = tf.norm(self.state[:, 0, 0:2] - self.state[:, -1, 0:2])
-        self._loss = tf.reduce_mean(sq_error_trans/sq_dist)
-        sq_error_rot = tf.norm(wrap_angle(self.state[:, -10:, 2] - self.pred_states[:, -10:, 2]))*(180/np.pi)
-        self._loss_op = tf.reduce_mean(sq_error_rot/ sq_dist)
+        sq_error_trans = tf.square(self.pred_states[:, -10:, 0:2] - self.state[:, -10:, 0:2])
+        sq_dist = tf.reduce_sum(tf.square(self.state[:, :1, 0:2] - self.state[:, -1:, 0:2]))
+        self._loss = tf.reduce_mean(sq_error_trans ** 0.5 / sq_dist ** 0.5)
+        sq_error_rot = tf.square(wrap_angle(self.state[:, -10:, 2:3] - self.pred_states[:, -10:, 2:3]))*(180/np.pi)
+        self._loss_op = tf.reduce_mean(sq_error_rot ** 0.5 / sq_dist ** 0.5)
         self._loss_final = tf.add(self._loss, self._loss_op)
-        # self._loss_op = tf.losses.mean_squared_error(labels=self.state[:,-1, :] - self.state[:, 0, :],
-        #                                              predictions=self.pred_states)
+
         optimizer = tf.train.AdamOptimizer(learning_rate=lr)
 
         if average_gradients == 1:
@@ -288,16 +199,6 @@ class DeepVOLSTM():
     def connect_modules(self):
 
         conv_model = keras.Sequential()
-        # conv_model.add(keras.layers.Conv2D(64, kernel_size=(7, 7), strides=(2, 2), padding='valid', name='conv1', input_shape=(384, 1280, 6),
-        #                                       trainable=False))
-        # conv_model.add(keras.layers.Conv2D(128, kernel_size=(5, 5), strides=(2, 2), padding='valid', name='conv2', trainable=False))
-        # conv_model.add(keras.layers.Conv2D(256, kernel_size=(5, 5), strides=(2, 2), padding='valid', name='conv3', trainable=False))
-        # conv_model.add(keras.layers.Conv2D(256, kernel_size=(3, 3), strides=(1, 1), padding='valid', name='conv3_1', trainable=False))
-        # conv_model.add(keras.layers.Conv2D(512, kernel_size=(3, 3), strides=(2, 2), padding='valid', name='conv4', trainable=False))
-        # conv_model.add(keras.layers.Conv2D(512, kernel_size=(3, 3), strides=(1, 1), padding='valid', name='conv4_1',trainable=False))
-        # conv_model.add(keras.layers.Conv2D(512, kernel_size=(3, 3), strides=(2, 2), padding='valid', name='conv5',trainable=False))
-        # conv_model.add(keras.layers.Conv2D(512, kernel_size=(3, 3), strides=(1, 1), padding='valid', name='conv5_1', trainable=False))
-        # conv_model.add(keras.layers.Conv2D(1024, kernel_size=(3, 3), strides=(2, 2), padding='valid', name='conv6', trainable=False))
 
         conv_model.add(keras.layers.Conv2D(64, kernel_size=(7, 7), strides=(2, 2), padding='valid', name='conv1', input_shape=(384, 1280, 6)))
         conv_model.add(keras.layers.Conv2D(128, kernel_size=(5, 5), strides=(2, 2), padding='valid', name='conv2'))
@@ -317,10 +218,7 @@ class DeepVOLSTM():
         lstm2 = keras.layers.CuDNNLSTM(1000, return_sequences=True)(lstm1)
 
         self.pred_states = keras.layers.Dense(3, activation='linear')(lstm2)
-        self.pred_states = self.pred_states + self.state[:, 0, :]
-        # model = keras.Model(inputs=[self.image_input], outputs=[self.pred_states])
-
-        # return model
+        self.pred_states = self.pred_states + self.state[:, :1, :]
 
 
     def generate_dataset(self, filenames, seq_len=[4540, 4660, 4070, 1590], num_of_samples=50, batch_seq_len=32):
@@ -328,12 +226,12 @@ class DeepVOLSTM():
         dataset = []
         for c, value in enumerate(filenames):
             dataset.append(tf.data.TFRecordDataset(value))   # Add all files to the dataset
-            seq_end = random.randint(1, seq_len[c])          # Get a random integer from (1, seq_len) of the sequence
-            dataset[c] = dataset[c].take(seq_end)            # Extract the first 'seq_end' elements of the sequence
-            dataset[c] = dataset[c].map(_parse_function)     # Extract the image and true state
-            shift = max(math.floor(seq_end / num_of_samples), 1)  # Compute the shift taking into account the 'seq_end' to have 'num_of_samples' elements in each dataset
+            seq_skip = random.randint(1, seq_len[c] - (batch_seq_len*num_of_samples))        # Get a random integer
+            shift = random.randint(1, math.floor((seq_len[c] - seq_skip) / num_of_samples))  # Compute the shift using the random integer
+            dataset[c] = dataset[c].skip(seq_skip)            # Skip the first 'seq_skip' elements of the sequence
+            dataset[c] = dataset[c].map(_parse_function)      # Extract the image and true state
             dataset[c] = dataset[c].apply(sliding.sliding_window_batch(batch_seq_len, shift))  # Apply sliding window operation
-
+            dataset[c] = dataset[c].take(num_of_samples)  # Take 'num_of_samples' from each training sequence
         random.shuffle(dataset)        # Shuffle the dataset list
 
         ds0 = dataset[0]               # Concatenate the datasets
@@ -342,7 +240,7 @@ class DeepVOLSTM():
 
         dataset = ds0.take(num_of_samples*len(seq_len))
         dataset = dataset.shuffle(buffer_size=20)
-        dataset = dataset.batch(1)     # Repeat the dataset with batch size of 1
+        dataset = dataset.batch(1)
         dataset = dataset.repeat()
 
         return dataset
@@ -351,19 +249,19 @@ class DeepVOLSTM():
 
         dataset = []
         for c, value in enumerate(filenames):
-            dataset.append(tf.data.TFRecordDataset(value))   # Add all files to the dataset
-            seq_end = random.randint(1, seq_len[c])          # Get a random integer from (1, seq_len) of the sequence
-            dataset[c] = dataset[c].take(seq_end)            # Extract the first 'seq_end' elements of the sequence
-            dataset[c] = dataset[c].map(_parse_function)     # Extract the image and true state
-            shift = max(math.floor(seq_end / num_of_samples), 1)  # Compute the shift taking into account the 'seq_end' to have 'num_of_samples' elements in each dataset
-            dataset[c] = dataset[c].apply(sliding.sliding_window_batch(batch_seq_len, shift))  # Apply sliding window operation
+            dataset.append(tf.data.TFRecordDataset(value))
+            seq_end = random.randint(1, seq_len[c])
+            dataset[c] = dataset[c].take(seq_end)
+            dataset[c] = dataset[c].map(_parse_function)
+            shift = max(math.floor(seq_end / num_of_samples), 1)
+            dataset[c] = dataset[c].apply(sliding.sliding_window_batch(batch_seq_len, shift))
 
-        ds0 = dataset[0]                                     # Concatenate the datasets
+        ds0 = dataset[0]
         for i in dataset[1:]:
             ds0 = ds0.concatenate(i)
 
         ds0 = ds0.take(num_of_samples*len(seq_len))
-        dataset = ds0.batch(1)                       # Repeat the dataset with batch size of 1
+        dataset = ds0.batch(1)
 
         return dataset
 
@@ -383,9 +281,7 @@ class DeepVOLSTM():
         return dataset
 
     def predict(self, sess, handle, test_handle):
-        # image_data, true_state = (sess.run([image, state]))
         prediction, true_state = sess.run([self.pred_states, self.state], feed_dict={handle: test_handle})
-        # pred_true_state = sess.run([self.pred_states], feed_dict={'input_1:0': image_data})
         return prediction, true_state
 
 
@@ -393,9 +289,6 @@ class DeepVOLSTM():
 
         # build the tensorflow graph
 
-        # self.image_input = keras.Input(shape=(batch_seq_len, 384, 1280, 6))
-        # self.model = self.connect_modules()
-        # self.model.load_weights('{}.h5'.format(model_path))
         self.image_input = keras.Input(shape=(batch_seq_len-1, 384, 1280, 6), tensor=self.image[:, 1:, :, :, :])
         self.connect_modules()
         saver = tf.train.Saver()

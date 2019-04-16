@@ -33,11 +33,14 @@ def run_cross_validation(i):
 
     method = DPF(**hyperparams['global'])
 
-    with tf.Session() as session:
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+
+    with tf.Session(config=config) as session:
         # train method and save result in model_path
         method.fit(session, data, model_path, plot=False, **hyperparams['train'])
 
 if __name__ == '__main__':
     # for i in range(11):
-    os.environ["CUDA_VISIBLE_DEVICES"] = "2,3"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
     run_cross_validation(0)

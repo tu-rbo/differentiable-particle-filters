@@ -66,10 +66,10 @@ def get_evaluation_stats(model_path='../models/tmp/best_deepvo_model',
 
                         prediction, true_state = method.predict(session, handle, test_handle)
                         dist = np.sqrt((true_state[0, -1, 0]-true_state[0, 0, 0])**2 + (true_state[0, -1, 1]-true_state[0, 0, 1])**2)
-                        error_x = true_state[0, -1, 0] - prediction[0, 0]
-                        error_y = true_state[0, -1, 1] - prediction[0, 1]
+                        error_x = true_state[0, -1, 0] - prediction[0, -1, 0]
+                        error_y = true_state[0, -1, 1] - prediction[0, -1, 1]
                         error_trans = np.sqrt(error_x ** 2 + error_y ** 2) / dist
-                        error_rot = abs(wrap_angle(true_state[0, -1, 2] - prediction[0, 2]))/dist * 180 / np.pi
+                        error_rot = abs(wrap_angle(true_state[0, -1, 2] - prediction[0, -1, 2]))/dist * 180 / np.pi
                         errors[test_traj][batch_seq_len]['trans'].append(error_trans)
                         errors[test_traj][batch_seq_len]['rot'].append(error_rot)
 
@@ -86,7 +86,7 @@ def find_all_cross_val_models(model_path):
     # trajs = [int(name.split('_')[3]) for name in models]
     # print (models, trajs)
     # return zip(models, trajs)
-    return zip(['best_deepvo_model_loss_last_step_dpf_theta']*4, [0, 2, 8, 9]) # [3, 4, 5, 6, 7]
+    return zip(['best_deepvo_model_loss_last_10_step_dpf_theta_Apr_4']*5, [3, 4, 5, 6, 7]) # [3, 4, 5, 6, 7]
 
 def main():
     plt.ion()
@@ -125,5 +125,5 @@ def main():
 
 
 if __name__ == '__main__':
-    os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0,1"
     main()

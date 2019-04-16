@@ -18,18 +18,22 @@ def get_default_hyperparams():
             'train_individually': True,
             'train_e2e': True,
             'split_ratio': 1,
-            'seq_len': 20,
-            'batch_size': 32,
+            'seq_len': 32,
+            'batch_size': 16,
             'epoch_length': 50,
-            'num_epochs': 10000,
-            'patience': 200,
-            'learning_rate': 0.0003,
+            'num_epochs': 1000,
+            'patience': 50,
+            'learning_rate': 0.00003,
             'dropout_keep_ratio': 0.3,
             'num_particles': 100,
             'particle_std': 0.2,
+            'batch_seq_len': 32,
+            'num_of_samples': 8
         },
         'test' : {
             'num_particles': 1000,
+            'batch_seq_len': 32,
+            'num_of_samples': 50
         }
     }
 

@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
-def get_evaluation_stats(model_path='../models/tmp/cross_validation_ind_e2e/model_trained_deepvo_0', test_trajectories=[3, 4, 5, 6, 7, 10], seq_lengths = [100, 200, 400, 800], plot_results=False):
+def get_evaluation_stats(model_path='../models/tmp/cross_validation_ind_e2e/model_trained_deepvo_0', test_trajectories=[5, 6, 7, 10], seq_lengths = [32], plot_results=False):
 
     data = load_kitti_sequences(test_trajectories)
 
@@ -161,14 +161,14 @@ def find_all_cross_val_models(model_path):
     print (models, trajs)
     # return zip(models, trajs)
     return zip(['model_trained_deepvo_0', 'model_trained_deepvo_0', 'model_trained_deepvo_0','model_trained_deepvo_0'
-                ,'model_trained_deepvo_0','model_trained_deepvo_0'], [3, 4, 5, 6, 7, 10])
+                ,'model_trained_deepvo_0','model_trained_deepvo_0'], [5, 6, 7, 10])
 
 def main():
     plt.ion()
 
     errors = dict()
-    average_errors = {'trans': {i: [] for i in [100, 200, 400, 800]},
-                      'rot': {i: [] for i in [100, 200, 400, 800]}}
+    average_errors = {'trans': {i: [] for i in [32]},   #100, 200, 400, 800
+                      'rot': {i: [] for i in [32]}}
     model_path = '../models/tmp/cross_validation_ind_e2e/'
     for model, traj in find_all_cross_val_models(model_path):
         print('!!! Evaluatng model {} on trajectory {}'.format(model, traj))
@@ -199,6 +199,6 @@ def main():
             print('{:>5} error averaged over seq_lens: {:.4f} +- {:.4f}'.format(measure, np.mean(e_means), np.std(e_means, ddof=1) / np.sqrt(len(e_means))))
 
 if __name__ == '__main__':
-    os.environ["CUDA_VISIBLE_DEVICES"] = "2,3"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "3"
     main()
 
